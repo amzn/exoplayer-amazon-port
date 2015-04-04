@@ -18,10 +18,12 @@ package com.google.android.exoplayer;
 import com.google.android.exoplayer.audio.AudioTrack;
 import com.google.android.exoplayer.drm.DrmSessionManager;
 import com.google.android.exoplayer.util.MimeTypes;
+import com.google.android.exoplayer.util.Logger;
 
 import android.annotation.TargetApi;
 import android.media.MediaCodec;
 import android.media.MediaFormat;
+import android.media.MediaCrypto;
 import android.media.audiofx.Virtualizer;
 import android.os.Handler;
 
@@ -32,6 +34,7 @@ import java.nio.ByteBuffer;
  */
 @TargetApi(16)
 public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer {
+   private static final String TAG = MediaCodecAudioTrackRenderer.class.getSimpleName();
 
   /**
    * Interface definition for a callback to be notified of {@link MediaCodecAudioTrackRenderer}
@@ -68,6 +71,7 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer {
   private int audioSessionId;
   private long currentPositionUs;
 
+  private final Logger log = new Logger(Logger.Module.Audio, TAG);
   /**
    * @param source The upstream source from which the renderer obtains samples.
    */
@@ -129,6 +133,7 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer {
 
   @Override
   protected boolean handlesMimeType(String mimeType) {
+    log.i("handlesMimeType: mimeType = " + mimeType);
     return MimeTypes.isAudio(mimeType) && super.handlesMimeType(mimeType);
   }
 
@@ -140,6 +145,7 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer {
 
   @Override
   protected void onOutputFormatChanged(MediaFormat format) {
+    log.i("onOutputFormatChanged: format = " + format);
     audioTrack.reconfigure(format);
   }
 
@@ -207,7 +213,12 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer {
       super.onDisabled();
     }
   }
-
+   @Override
+  protected void configureCodec(MediaCodec codec, android.media.MediaFormat format,
+    MediaCrypto crypto) {
+    super.configureCodec(codec, format, crypto);
+    log.setTAG(selectedDecoderName + " " + TAG);
+  }
   @Override
   protected void seekTo(long positionUs) throws ExoPlaybackException {
     super.seekTo(positionUs);
@@ -220,7 +231,13 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer {
   protected boolean processOutputBuffer(long positionUs, long elapsedRealtimeUs, MediaCodec codec,
       ByteBuffer buffer, MediaCodec.BufferInfo bufferInfo, int bufferIndex, boolean shouldSkip)
       throws ExoPlaybackException {
+    log.d("processOutputBuffer: positionUs = " + positionUs +
+            " elapsedRealtimeUs =  " + elapsedRealtimeUs +
+            " bufferIndex = " + bufferIndex +
+            " shouldSkip = " + shouldSkip +
+            " presentationTimeUs = " + bufferInfo.presentationTimeUs);
     if (shouldSkip) {
+      log.w("Skipping Audio sample!!!");
       codec.releaseOutputBuffer(bufferIndex, false);
       codecCounters.skippedOutputBufferCount++;
       audioTrack.handleDiscontinuity();
@@ -300,5 +317,4 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer {
       });
     }
   }
-
 }
