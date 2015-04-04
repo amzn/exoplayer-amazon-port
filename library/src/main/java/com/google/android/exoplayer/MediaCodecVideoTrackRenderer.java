@@ -409,6 +409,9 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
             " currentWidth = " + currentWidth +
             " currentHeight = " + currentHeight +
             " currentPixelWidthHeightRatio = " + currentPixelWidthHeightRatio);
+    // Notify video size change early by the time
+    // we notify state change to READY
+    maybeNotifyVideoSizeChanged();// AMZN_CHANGE_ONELINE
   }
 
   @Override
@@ -546,6 +549,12 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
         && lastReportedPixelWidthHeightRatio == currentPixelWidthHeightRatio)) {
       return;
     }
+    // AMZN_CHANGE_BEGIN
+    // We don't want to send video size notification when the size is not detected yet
+    if(currentHeight == -1 || currentWidth == -1) {
+        return;
+    }
+    // AMZN_CHANGE_END
     // Make final copies to ensure the runnable reports the correct values.
     final int currentWidth = this.currentWidth;
     final int currentHeight = this.currentHeight;
