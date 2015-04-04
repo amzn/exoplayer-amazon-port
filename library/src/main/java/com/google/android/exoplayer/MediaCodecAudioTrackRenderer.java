@@ -19,6 +19,7 @@ import com.google.android.exoplayer.MediaCodecUtil.DecoderQueryException;
 import com.google.android.exoplayer.audio.AudioTrack;
 import com.google.android.exoplayer.drm.DrmSessionManager;
 import com.google.android.exoplayer.util.MimeTypes;
+import com.google.android.exoplayer.util.Logger;
 
 import android.annotation.TargetApi;
 import android.media.MediaCodec;
@@ -32,6 +33,7 @@ import java.nio.ByteBuffer;
  */
 @TargetApi(16)
 public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer implements MediaClock {
+   private static final String TAG = MediaCodecAudioTrackRenderer.class.getSimpleName();
 
   /**
    * Interface definition for a callback to be notified of {@link MediaCodecAudioTrackRenderer}
@@ -74,6 +76,7 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer implem
   private long currentPositionUs;
   private boolean allowPositionDiscontinuity;
 
+  private final Logger log = new Logger(Logger.Module.Audio, TAG);
   /**
    * @param source The upstream source from which the renderer obtains samples.
    */
@@ -140,6 +143,7 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer implem
   @Override
   protected void configureCodec(MediaCodec codec, String codecName,
       android.media.MediaFormat format, android.media.MediaCrypto crypto) {
+    log.setTAG(codecName + " " + TAG);
     if (RAW_DECODER_NAME.equals(codecName)) {
       // Override the MIME type used to configure the codec if we are using a passthrough decoder.
       String mimeType = format.getString(android.media.MediaFormat.KEY_MIME);
@@ -158,6 +162,7 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer implem
 
   @Override
   protected boolean handlesMimeType(String mimeType) {
+    log.i("handlesMimeType: mimeType = " + mimeType);
     return MimeTypes.isAudio(mimeType) && super.handlesMimeType(mimeType);
   }
 
@@ -170,6 +175,7 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer implem
   @Override
   protected void onOutputFormatChanged(MediaFormat inputFormat,
       android.media.MediaFormat outputFormat) {
+    log.i("onOutputFormatChanged: inputFormat = " + inputFormat + " outputFormat = " + outputFormat);
     if (MimeTypes.isPassthroughAudio(inputFormat.mimeType)) {
       audioTrack.reconfigure(inputFormat.getFrameworkMediaFormatV16());
     } else {
@@ -257,7 +263,13 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer implem
   protected boolean processOutputBuffer(long positionUs, long elapsedRealtimeUs, MediaCodec codec,
       ByteBuffer buffer, MediaCodec.BufferInfo bufferInfo, int bufferIndex, boolean shouldSkip)
       throws ExoPlaybackException {
+    log.d("processOutputBuffer: positionUs = " + positionUs +
+            " elapsedRealtimeUs =  " + elapsedRealtimeUs +
+            " bufferIndex = " + bufferIndex +
+            " shouldSkip = " + shouldSkip +
+            " presentationTimeUs = " + bufferInfo.presentationTimeUs);
     if (shouldSkip) {
+      log.w("Skipping Audio sample!!!");
       codec.releaseOutputBuffer(bufferIndex, false);
       codecCounters.skippedOutputBufferCount++;
       audioTrack.handleDiscontinuity();
