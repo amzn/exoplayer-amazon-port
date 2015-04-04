@@ -19,6 +19,7 @@ import com.google.android.exoplayer.drm.DrmSessionManager;
 import com.google.android.exoplayer.util.MimeTypes;
 import com.google.android.exoplayer.util.TraceUtil;
 import com.google.android.exoplayer.util.Util;
+import com.google.android.exoplayer.util.Logger;
 
 import android.annotation.TargetApi;
 import android.media.MediaCodec;
@@ -34,6 +35,7 @@ import java.nio.ByteBuffer;
  */
 @TargetApi(16)
 public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
+   private final String TAG = MediaCodecVideoTrackRenderer.class.getSimpleName();
 
   /**
    * Interface definition for a callback to be notified of {@link MediaCodecVideoTrackRenderer}
@@ -136,6 +138,7 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
   private int lastReportedHeight;
   private float lastReportedPixelWidthHeightRatio;
 
+  private final Logger log = new Logger(Logger.Module.Video, TAG);
   /**
    * @param source The upstream source from which the renderer obtains samples.
    * @param videoScalingMode The scaling mode to pass to
@@ -360,6 +363,12 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
   @Override
   protected void configureCodec(MediaCodec codec, String codecName,
       android.media.MediaFormat format, MediaCrypto crypto) {
+    log.setTAG(codecName + " " + TAG);
+    log.i("configureCodec: codecName = " + codecName +
+        " format = " + format +
+        " surface = " + surface +
+        " crypto = " + crypto +
+        " videoScalingMode = " + videoScalingMode);
     codec.configure(format, surface, crypto, 0);
     codec.setVideoScalingMode(videoScalingMode);
   }
@@ -371,6 +380,7 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
     // to be a way to pass a custom key/value pair value through to the output format.
     currentPixelWidthHeightRatio = holder.format.pixelWidthHeightRatio == MediaFormat.NO_VALUE ? 1
         : holder.format.pixelWidthHeightRatio;
+    log.i("onInputFormatChanged: format = " + holder.format);
   }
 
   /**
@@ -383,6 +393,7 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
   @Override
   protected void onOutputFormatChanged(MediaFormat inputFormat,
       android.media.MediaFormat outputFormat) {
+    log.i("onOutputFormatChanged: inputFormat = " + inputFormat + " outputFormat = " + outputFormat);
     boolean hasCrop = outputFormat.containsKey(KEY_CROP_RIGHT)
         && outputFormat.containsKey(KEY_CROP_LEFT) && outputFormat.containsKey(KEY_CROP_BOTTOM)
         && outputFormat.containsKey(KEY_CROP_TOP);
@@ -392,6 +403,9 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
     currentHeight = hasCrop
         ? outputFormat.getInteger(KEY_CROP_BOTTOM) - outputFormat.getInteger(KEY_CROP_TOP) + 1
         : outputFormat.getInteger(android.media.MediaFormat.KEY_HEIGHT);
+    log.i("hasCrop = " + hasCrop +
+            " currentWidth = " + currentWidth +
+            " currentHeight = " + currentHeight);
   }
 
   @Override
@@ -405,6 +419,11 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
   @Override
   protected boolean processOutputBuffer(long positionUs, long elapsedRealtimeUs, MediaCodec codec,
       ByteBuffer buffer, MediaCodec.BufferInfo bufferInfo, int bufferIndex, boolean shouldSkip) {
+    log.d("processOutputBuffer: positionUs = " + positionUs +
+                             " elapsedRealtimeUs = " + elapsedRealtimeUs +
+                             " bufferIndex = " + bufferIndex +
+                             " shouldSkip = " + shouldSkip +
+                             " presentationTimeUs = " + bufferInfo.presentationTimeUs);
     if (shouldSkip) {
       skipOutputBuffer(codec, bufferIndex);
       return true;
@@ -472,6 +491,7 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
   }
 
   protected void skipOutputBuffer(MediaCodec codec, int bufferIndex) {
+    log.d("skipOutputBuffer: bufferIndex = " + bufferIndex);
     TraceUtil.beginSection("skipVideoBuffer");
     codec.releaseOutputBuffer(bufferIndex, false);
     TraceUtil.endSection();
@@ -479,6 +499,7 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
   }
 
   protected void dropOutputBuffer(MediaCodec codec, int bufferIndex) {
+    log.i("dropOutputBuffer: bufferIndex = " + bufferIndex);
     TraceUtil.beginSection("dropVideoBuffer");
     codec.releaseOutputBuffer(bufferIndex, false);
     TraceUtil.endSection();
@@ -490,6 +511,7 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
   }
 
   protected void renderOutputBufferImmediate(MediaCodec codec, int bufferIndex) {
+    log.d("renderOutputBufferImmediate: " + bufferIndex);
     maybeNotifyVideoSizeChanged();
     TraceUtil.beginSection("renderVideoBufferImmediate");
     codec.releaseOutputBuffer(bufferIndex, true);
@@ -501,6 +523,7 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
 
   @TargetApi(21)
   protected void renderOutputBufferTimedV21(MediaCodec codec, int bufferIndex, long releaseTimeNs) {
+    log.d("renderOutputBufferTimedV21: bufferIndex = " + bufferIndex + " releaseTimeNs = " + releaseTimeNs);
     maybeNotifyVideoSizeChanged();
     TraceUtil.beginSection("releaseOutputBufferTimed");
     codec.releaseOutputBuffer(bufferIndex, releaseTimeNs);
@@ -520,6 +543,7 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
     final int currentWidth = this.currentWidth;
     final int currentHeight = this.currentHeight;
     final float currentPixelWidthHeightRatio = this.currentPixelWidthHeightRatio;
+    log.i("maybeNotifyVideoSizeChanged: width = " + currentWidth + " height = " + currentHeight );
     eventHandler.post(new Runnable()  {
       @Override
       public void run() {
