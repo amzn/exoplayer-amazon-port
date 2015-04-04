@@ -414,7 +414,7 @@ public final class AudioTrack {
       // This is the first time we've seen this {@code buffer}.
       // Note: presentationTimeUs corresponds to the end of the sample, not the start.
       long bufferStartTime = presentationTimeUs - framesToDurationUs(bytesToFrames(size));
-      if (startMediaTimeUs == START_NOT_SET) {
+      if (startMediaTimeState == START_NOT_SET) { // AMZN_CHANGE_ONELINE
         startMediaTimeUs = Math.max(0, bufferStartTime);
         log.i("Setting StartMediaTimeUs = " + startMediaTimeUs);
         startMediaTimeState = START_IN_SYNC;
@@ -542,7 +542,10 @@ public final class AudioTrack {
     if (isInitialized()) {
       submittedBytes = 0;
       temporaryBufferSize = 0;
-      startMediaTimeUs = START_NOT_SET;
+      // AMZN_CHANGE_BEGIN
+      startMediaTimeState = START_NOT_SET;
+      startMediaTimeUs = 0;
+      // AMZN_CHANGE_END
       resetSyncParams();
       int playState = audioTrack.getPlayState();
       if (playState == android.media.AudioTrack.PLAYSTATE_PLAYING) {
@@ -568,7 +571,7 @@ public final class AudioTrack {
 
   /** Returns whether {@link #getCurrentPositionUs} can return the current playback position. */
   private boolean hasCurrentPositionUs() {
-    return isInitialized() && startMediaTimeUs != START_NOT_SET;
+    return isInitialized() && (startMediaTimeState != START_NOT_SET); // AMZN_CHANGE_ONELINE
   }
 
   /** Updates the audio track latency and playback position parameters. */
