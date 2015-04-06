@@ -692,13 +692,19 @@ public class SmoothStreamingManifestParser implements ManifestParser<SmoothStrea
 
     private static String fourCCToMimeType(String fourCC) {
       if (fourCC.equalsIgnoreCase("H264") || fourCC.equalsIgnoreCase("X264")
-          || fourCC.equalsIgnoreCase("AVC1") || fourCC.equalsIgnoreCase("DAVC")) {
-        return MimeTypes.VIDEO_H264;
+            || fourCC.equalsIgnoreCase("AVC1") || fourCC.equalsIgnoreCase("DAVC")) {
+          return MimeTypes.VIDEO_H264;
       } else if (fourCC.equalsIgnoreCase("AAC") || fourCC.equalsIgnoreCase("AACL")
-          || fourCC.equalsIgnoreCase("AACH") || fourCC.equalsIgnoreCase("AACP")) {
-        return MimeTypes.AUDIO_AAC;
+            || fourCC.equalsIgnoreCase("AACH") || fourCC.equalsIgnoreCase("AACP")) {
+          return MimeTypes.AUDIO_AAC;
+       // AMZN_CHANGE_BEGIN
+      } else if (fourCC.equalsIgnoreCase("EC-3")) {
+          return MimeTypes.AUDIO_EC3;
+      } else if (fourCC.equalsIgnoreCase("AC-3")) {
+          return MimeTypes.AUDIO_AC3;
+       // AMZN_CHANGE_END
       } else if (fourCC.equalsIgnoreCase("TTML")) {
-        return MimeTypes.APPLICATION_TTML;
+          return MimeTypes.APPLICATION_TTML;
       }
       return null;
     }
