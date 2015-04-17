@@ -406,6 +406,18 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
     outputIndex = -1;
     waitingForFirstSyncFrame = true;
     codecCounters.codecInitCount++;
+    // AMZN_CHANGE_BEGIN
+    // Even though we are creating a new codec we could append
+    // config data when needed.(i.e in case of video decoder). If not done,
+    // some smooth streaming content decoding throws
+    // "Error code = 0x34 : VIDC_1080P_ERROR_HEADER_NOT_FOUND" in Fire TV.
+    // This code will handle the case when config data is not appended as part of
+    // first frame by the source.
+    if (canReconfigureCodec(codec, codecIsAdaptive, null, format)) {
+        codecReconfigured = true;
+        codecReconfigurationState = RECONFIGURATION_STATE_WRITE_PENDING;
+    }
+    // AMZN_CHANGE_END
   }
 
   private void notifyAndThrowDecoderInitError(DecoderInitializationException e)
