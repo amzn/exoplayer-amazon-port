@@ -385,6 +385,20 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
     outputIndex = -1;
     waitingForFirstSyncFrame = true;
     codecCounters.codecInitCount++;
+    // AMZN_CHANGE_BEGIN
+    // Even though we are creating a new codec we could append
+    // config data when needed.(i.e in case of video decoder). If not done,
+    // some smooth streaming content decoding throws
+    // "Error code = 0x34 : VIDC_1080P_ERROR_HEADER_NOT_FOUND" in Fire TV.
+    // This code will handle the case when config data is not appended as part of
+    // first frame by the source.
+    if (canReconfigureCodec(codec, codecIsAdaptive, null, format)) {
+        //log.d("Configuring decoder");
+        codecReconfigured = true;
+        codecReconfigurationState = RECONFIGURATION_STATE_WRITE_PENDING;
+        //log.v("codecReconfigurationState = RECONFIGURATION_STATE_WRITE_PENDING");
+    }
+    // AMZN_CHANGE_END
   }
 
   private void notifyAndThrowDecoderInitError(DecoderInitializationException e)
@@ -728,18 +742,22 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
    * @throws ExoPlaybackException If an error occurs reinitializing the {@link MediaCodec}.
    */
   protected void onInputFormatChanged(MediaFormatHolder formatHolder) throws ExoPlaybackException {
+    //log.i("onInputFormatChanged: format = " + formatHolder.format);
     MediaFormat oldFormat = format;
     format = formatHolder.format;
     drmInitData = formatHolder.drmInitData;
     if (codec != null && canReconfigureCodec(codec, codecIsAdaptive, oldFormat, format)) {
       codecReconfigured = true;
       codecReconfigurationState = RECONFIGURATION_STATE_WRITE_PENDING;
+      //log.v("codecReconfigurationState = RECONFIGURATION_STATE_WRITE_PENDING");
     } else {
       if (codecReceivedBuffers) {
         // Signal end of stream and wait for any final output buffers before re-initialization.
         codecReinitializationState = REINITIALIZATION_STATE_SIGNAL_END_OF_STREAM;
+        //log.v("codecReinitializationState = REINITIALIZATION_STATE_SIGNAL_END_OF_STREAM");
       } else {
         // There aren't any final output buffers, so perform re-initialization immediately.
+        //log.i("releasing and reiniting codec");
         releaseCodec();
         maybeInitCodec();
       }
