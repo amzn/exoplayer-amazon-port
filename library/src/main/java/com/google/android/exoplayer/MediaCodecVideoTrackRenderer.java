@@ -370,9 +370,13 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
   @Override
   protected boolean canReconfigureCodec(MediaCodec codec, boolean codecIsAdaptive,
       MediaFormat oldFormat, MediaFormat newFormat) {
-    return newFormat.mimeType.equals(oldFormat.mimeType)
+    // AMZN_CHANGE_BEGIN
+    // When a codec is created, we still want to append the config data before it is used.
+    // Detect this when old format is null
+    return oldFormat == null || (newFormat.mimeType.equals(oldFormat.mimeType)
         && (codecIsAdaptive
-            || (oldFormat.width == newFormat.width && oldFormat.height == newFormat.height));
+            || (oldFormat.width == newFormat.width && oldFormat.height == newFormat.height)));
+    // AMZN_CHANGE_END
   }
 
   @Override
