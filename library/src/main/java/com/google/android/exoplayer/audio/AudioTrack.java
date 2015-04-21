@@ -21,6 +21,7 @@ import com.google.android.exoplayer.util.Assertions;
 import com.google.android.exoplayer.util.DtsUtil;
 import com.google.android.exoplayer.util.MimeTypes;
 import com.google.android.exoplayer.util.Util;
+import com.google.android.exoplayer.util.AmazonQuirks; // AMZN_CHANGE_ONELINE
 
 import android.annotation.TargetApi;
 import android.media.AudioFormat;
@@ -230,6 +231,12 @@ public final class AudioTrack {
   private ByteBuffer resampledBuffer;
   private boolean useResampledBuffer;
 
+  // AMZN_CHANGE_BEGIN
+  /** A boolean to enable latency quirk.
+  Enabled when getPlayHeadPosition includes audio latencies */
+  private boolean isLatencyQuirkEnabled = false;
+  // AMZN_CHANGE_END
+
   /**
    * Creates an audio track with default audio capabilities (no encoded audio passthrough support).
    */
@@ -246,6 +253,10 @@ public final class AudioTrack {
   public AudioTrack(AudioCapabilities audioCapabilities, int streamType) {
     this.audioCapabilities = audioCapabilities;
     this.streamType = streamType;
+    // AMZN_CHANGE_BEGIN
+    isLatencyQuirkEnabled = AmazonQuirks.isLatencyQuirkEnabled();
+    Log.i(TAG, "isLatencyQuirkEnabled = " + isLatencyQuirkEnabled);
+    // AMZN_CHANGE_END
     releasingConditionVariable = new ConditionVariable(true);
     if (Util.SDK_INT >= 18) {
       try {
@@ -253,15 +264,19 @@ public final class AudioTrack {
             android.media.AudioTrack.class.getMethod("getLatency", (Class<?>[]) null);
       } catch (NoSuchMethodException e) {
         // There's no guarantee this method exists. Do nothing.
+      } catch (NoClassDefFoundError e) {
+        //Exception on JB
       }
     }
+    // AMZN_CHANGE_BEGIN
     if (Util.SDK_INT >= 23) {
-      audioTrackUtil = new AudioTrackUtilV23();
+      audioTrackUtil = new AudioTrackUtilV23(isLatencyQuirkEnabled, getLatencyMethod);
     } else if (Util.SDK_INT >= 19) {
-      audioTrackUtil = new AudioTrackUtilV19();
+      audioTrackUtil = new AudioTrackUtilV19(isLatencyQuirkEnabled, getLatencyMethod);
     } else {
-      audioTrackUtil = new AudioTrackUtil();
+      audioTrackUtil = new AudioTrackUtil(isLatencyQuirkEnabled, getLatencyMethod);
     }
+    // AMZN_CHANGE_END
     playheadOffsets = new long[MAX_PLAYHEAD_OFFSET_COUNT];
     volume = 1.0f;
     startMediaTimeState = START_NOT_SET;
@@ -538,6 +553,7 @@ public final class AudioTrack {
   public void play() {
     if (isInitialized()) {
       resumeSystemTimeUs = System.nanoTime() / 1000;
+      audioTrackUtil.play(); // AMZN_CHANGE_ONELINE
       audioTrack.play();
     }
   }
@@ -868,7 +884,11 @@ public final class AudioTrack {
           audioTimestampSet = false;
         }
       }
-      if (getLatencyMethod != null && !passthrough) {
+      // AMZN_CHANGE_BEGIN
+      if (isLatencyQuirkEnabled) {
+        // Get the audio h/w latency
+        latencyUs = AmazonQuirks.getAudioHWLatency();
+      } else if (getLatencyMethod != null && !passthrough) {
         try {
           // Compute the audio track latency, excluding the latency due to the buffer (leaving
           // latency due to the mixer and audio hardware driver).
@@ -886,6 +906,7 @@ public final class AudioTrack {
           getLatencyMethod = null;
         }
       }
+      // AMZN_CHANGE_END
       lastTimestampSampleTimeUs = systemClockUs;
     }
   }
@@ -954,11 +975,26 @@ public final class AudioTrack {
    * around an issue on platform API versions 21/22 where AC-3 audio tracks can't be paused, so we
    * empty their buffers when paused. In this case, they should still behave as if they have
    * pending data, otherwise writing will never resume.
+   *
+   * Additionally, in FireOS 4 based Amazon Tablets, after playback is resumed,
+   * the play head position returned by AudioTrack during its stabilization phase
+   * jumps to a high value, causing us to falsely believe that there is an under-run.
+   * This workaround makes us behave as though AudioTrack has pending data irrespective of
+   * the playback head position reported by AudioTrack til 1 sec after playback has resumed.
    */
   private boolean overrideHasPendingData() {
-    return needsPassthroughWorkarounds()
-        && audioTrack.getPlayState() == android.media.AudioTrack.PLAYSTATE_PAUSED
-        && audioTrack.getPlaybackHeadPosition() == 0;
+    //AMZN_CHANGE_BEGIN
+    boolean hasPendingPassthroughData = needsPassthroughWorkarounds()
+        && ( audioTrack.getPlayState() == android.media.AudioTrack.PLAYSTATE_PAUSED )
+        && ( audioTrack.getPlaybackHeadPosition() == 0 );
+    if (hasPendingPassthroughData) {
+      return true;
+    }
+    boolean hasPendingDataQuirk = AmazonQuirks.isLatencyQuirkEnabled()
+        && ( audioTrack.getPlayState() == android.media.AudioTrack.PLAYSTATE_PLAYING )
+        && ( ((System.nanoTime() / 1000) - resumeSystemTimeUs) < C.MICROS_PER_SECOND );
+    return hasPendingDataQuirk;
+    //AMZN_CHANGE_END
   }
 
   /**
@@ -1135,6 +1171,34 @@ public final class AudioTrack {
       audioTrack.pause();
     }
 
+    // AMZN_CHANGE_BEGIN
+    private boolean isLatencyQuirkEnabled;
+    private Method getLatencyMethod;
+    private long   resumeTime;
+    public AudioTrackUtil(boolean isLatencyQuirkEnabled,
+                            Method getLatencyMethod) {
+      this.isLatencyQuirkEnabled = isLatencyQuirkEnabled;
+      this.getLatencyMethod = getLatencyMethod;
+    }
+
+    private int getAudioSWLatencies() {
+        int swLatencyFrames = 0;
+        if (getLatencyMethod == null) {
+            return 0;
+        }
+        try {
+            Integer swLatencyMs = 0;
+            swLatencyMs = (Integer) getLatencyMethod.invoke(audioTrack, (Object[]) null);
+            swLatencyFrames = swLatencyMs * (sampleRate / 1000);
+        } catch (Exception e) {
+            return 0;
+        }
+        return swLatencyFrames;
+    }
+
+    public void play() {
+        resumeTime = SystemClock.uptimeMillis();
+    }
     /**
      * {@link android.media.AudioTrack#getPlaybackHeadPosition()} returns a value intended to be
      * interpreted as an unsigned 32 bit integer, which also wraps around periodically. This method
@@ -1158,23 +1222,49 @@ public final class AudioTrack {
         return 0;
       }
 
-      long rawPlaybackHeadPosition = 0xFFFFFFFFL & audioTrack.getPlaybackHeadPosition();
-      if (needsPassthroughWorkaround) {
-        // Work around an issue with passthrough/direct AudioTracks on platform API versions 21/22
-        // where the playback head position jumps back to zero on paused passthrough/direct audio
-        // tracks. See [Internal: b/19187573].
-        if (state == android.media.AudioTrack.PLAYSTATE_PAUSED && rawPlaybackHeadPosition == 0) {
-          passthroughWorkaroundPauseOffset = lastRawPlaybackHeadPosition;
+      long rawPlaybackHeadPosition = 0;
+      if (isLatencyQuirkEnabled) {
+        int php = audioTrack.getPlaybackHeadPosition();
+        // if audio track includes latency while returning play head position
+        // we try to compensate it back by adding the latency back to it,
+        // if the track is in playing state or if pause state and php is non-zero
+        int trackState = audioTrack.getPlayState();
+        if (trackState == android.media.AudioTrack.PLAYSTATE_PLAYING ||
+             (trackState == android.media.AudioTrack.PLAYSTATE_PAUSED && php != 0)) {
+          php += getAudioSWLatencies();
         }
-        rawPlaybackHeadPosition += passthroughWorkaroundPauseOffset;
-      }
-      if (lastRawPlaybackHeadPosition > rawPlaybackHeadPosition) {
-        // The value must have wrapped around.
-        rawPlaybackHeadWrapCount++;
+        if ( php < 0 && SystemClock.uptimeMillis() - resumeTime < C.MILLIS_PER_SECOND) {
+            php = 0;
+            Log.i(TAG, "php is negative during latency stabilization phase ...resetting to 0");
+        }
+        rawPlaybackHeadPosition = 0xFFFFFFFFL & php;
+        if (lastRawPlaybackHeadPosition > rawPlaybackHeadPosition &&
+                lastRawPlaybackHeadPosition > 0x7FFFFFFFL &&
+              (lastRawPlaybackHeadPosition - rawPlaybackHeadPosition >= 0x7FFFFFFFL) ) {
+              // The value must have wrapped around.
+          Log.i(TAG, "The playback head position wrapped around");
+          rawPlaybackHeadWrapCount++;
+        }
+      } else {
+        rawPlaybackHeadPosition = 0xFFFFFFFFL & audioTrack.getPlaybackHeadPosition();
+        if (needsPassthroughWorkaround) {
+          // Work around an issue with passthrough/direct AudioTracks on platform API versions 21/22
+          // where the playback head position jumps back to zero on paused passthrough/direct audio
+          // tracks. See [Internal: b/19187573].
+          if (state == android.media.AudioTrack.PLAYSTATE_PAUSED && rawPlaybackHeadPosition == 0) {
+            passthroughWorkaroundPauseOffset = lastRawPlaybackHeadPosition;
+          }
+          rawPlaybackHeadPosition += passthroughWorkaroundPauseOffset;
+        }
+        if (lastRawPlaybackHeadPosition > rawPlaybackHeadPosition) {
+          // The value must have wrapped around.
+          rawPlaybackHeadWrapCount++;
+        }
       }
       lastRawPlaybackHeadPosition = rawPlaybackHeadPosition;
       return rawPlaybackHeadPosition + (rawPlaybackHeadWrapCount << 32);
     }
+    // AMZN_CHANGE_END
 
     /**
      * Returns {@link #getPlaybackHeadPosition()} expressed as microseconds.
@@ -1255,9 +1345,13 @@ public final class AudioTrack {
     private long lastRawTimestampFramePosition;
     private long lastTimestampFramePosition;
 
-    public AudioTrackUtilV19() {
+    // AMZN_CHANGE_BEGIN
+    public AudioTrackUtilV19(boolean isLatencyQuirkEnabled,
+                            Method getLatencyMethod) {
+      super(isLatencyQuirkEnabled,getLatencyMethod);
       audioTimestamp = new AudioTimestamp();
     }
+    // AMZN_CHANGE_END
 
     @Override
     public void reconfigure(android.media.AudioTrack audioTrack,
@@ -1301,9 +1395,13 @@ public final class AudioTrack {
     private PlaybackParams playbackParams;
     private float playbackSpeed;
 
-    public AudioTrackUtilV23() {
+    // AMZN_CHANGE_BEGIN
+    public AudioTrackUtilV23(boolean isLatencyQuirkEnabled,
+            Method getLatencyMethod) {
+      super(isLatencyQuirkEnabled,getLatencyMethod);
       playbackSpeed = 1.0f;
     }
+    // AMZN_CHANGE_END
 
     @Override
     public void reconfigure(android.media.AudioTrack audioTrack,
