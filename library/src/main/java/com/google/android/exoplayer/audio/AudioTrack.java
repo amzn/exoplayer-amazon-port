@@ -18,6 +18,7 @@ package com.google.android.exoplayer.audio;
 import com.google.android.exoplayer.C;
 import com.google.android.exoplayer.util.Util;
 import com.google.android.exoplayer.util.Logger;
+import com.google.android.exoplayer.util.AmazonQuirks; // AMZN_CHANGE_ONELINE
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
@@ -27,6 +28,7 @@ import android.media.AudioTimestamp;
 import android.media.MediaFormat;
 import android.os.ConditionVariable;
 import android.util.Log;
+import android.os.Build; // AMZN_CHANGE_ONELINE
 
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -167,6 +169,12 @@ public final class AudioTrack {
 
   private final Logger log = new Logger(Logger.Module.Audio, TAG);
 
+  // AMZN_CHANGE_BEGIN
+  /** A boolean to enable latency quirk.
+  Enabled when getPlayHeadPosition includes audio latencies */
+  private boolean isLatencyQuirkEnabled = false;
+  // AMZN_CHANGE_END
+
   public AudioTrack() {
     releasingConditionVariable = new ConditionVariable(true);
     if (Util.SDK_INT >= 18) {
@@ -180,6 +188,10 @@ public final class AudioTrack {
     playheadOffsets = new long[MAX_PLAYHEAD_OFFSET_COUNT];
     volume = 1.0f;
     startMediaTimeState = START_NOT_SET;
+     // AMZN_CHANGE_BEGIN
+    isLatencyQuirkEnabled = AmazonQuirks.isLatencyQuirkEnabled();
+    log.i("isLatencyQuirkEnabled = " + isLatencyQuirkEnabled);
+     // AMZN_CHANGE_END
   }
 
   /**
@@ -274,11 +286,15 @@ public final class AudioTrack {
     }
 
     checkAudioTrackInitialized();
+    // AMZN_CHANGE_BEGIN
     if (Util.SDK_INT >= 19) {
-      audioTrackUtil = new AudioTrackUtilV19(audioTrack);
+      audioTrackUtil = new AudioTrackUtilV19(audioTrack,
+                                               isLatencyQuirkEnabled, getLatencyMethod);
     } else {
-      audioTrackUtil = new AudioTrackUtil(audioTrack);
+      audioTrackUtil = new AudioTrackUtil(audioTrack,
+                                                isLatencyQuirkEnabled, getLatencyMethod);
     }
+    //AMZN_CHANGE_END
     setVolume(volume);
     return audioTrack.getAudioSessionId();
   }
@@ -623,7 +639,11 @@ public final class AudioTrack {
               + playbackPositionUs);
         }
       }
-      if (getLatencyMethod != null) {
+      // AMZN_CHANGE_BEGIN
+      if(isLatencyQuirkEnabled) {
+        // Get the audio h/w latency
+        latencyUs = AmazonQuirks.getAudioHWLatency();
+      } else if (getLatencyMethod != null) {
         try {
           // Compute the audio track latency, excluding the latency due to the buffer (leaving
           // latency due to the mixer and audio hardware driver).
@@ -641,6 +661,7 @@ public final class AudioTrack {
           getLatencyMethod = null;
         }
       }
+      // AMZN_CHANGE_END
       lastTimestampSampleTimeUs = systemClockUs;
     }
   }
@@ -706,10 +727,31 @@ public final class AudioTrack {
 
     private long lastRawPlaybackHeadPosition;
     private long rawPlaybackHeadWrapCount;
-
-    public AudioTrackUtil(android.media.AudioTrack audioTrack) {
+    // AMZN_CHANGE_BEGIN
+    private boolean isLatencyQuirkEnabled;
+    private Method getLatencyMethod;
+    public AudioTrackUtil(android.media.AudioTrack audioTrack,
+                            boolean isLatencyQuirkEnabled,
+                            Method getLatencyMethod) {
       this.audioTrack = audioTrack;
       this.sampleRate = audioTrack.getSampleRate();
+      this.isLatencyQuirkEnabled = isLatencyQuirkEnabled;
+      this.getLatencyMethod = getLatencyMethod;
+    }
+
+    private int getAudioSWLatencies() {
+        int swLatencyFrames = 0;
+        if(getLatencyMethod == null) {
+            return 0;
+        }
+        try {
+            Integer swLatencyMs = 0;
+            swLatencyMs = (Integer) getLatencyMethod.invoke(audioTrack, (Object[]) null);
+            swLatencyFrames = swLatencyMs * (sampleRate / 1000);
+        } catch (Exception e) {
+            return 0;
+        }
+        return swLatencyFrames;
     }
 
     /**
@@ -722,14 +764,26 @@ public final class AudioTrack {
      *     expressed as a long.
      */
     public long getPlaybackHeadPosition() {
-      long rawPlaybackHeadPosition = 0xFFFFFFFFL & audioTrack.getPlaybackHeadPosition();
-      if (lastRawPlaybackHeadPosition > rawPlaybackHeadPosition) {
-        // The value must have wrapped around.
-        rawPlaybackHeadWrapCount++;
+      int php = audioTrack.getPlaybackHeadPosition();
+      // if audio track includes latency while returning play head position
+      // we try to compensate it back by adding the latency back to it,
+      // if the track is in playing state
+      if(isLatencyQuirkEnabled &&
+            audioTrack.getPlayState() == android.media.AudioTrack.PLAYSTATE_PLAYING) {
+        php += getAudioSWLatencies();
+      }
+      long rawPlaybackHeadPosition = 0xFFFFFFFFL & php;
+      if (lastRawPlaybackHeadPosition > rawPlaybackHeadPosition &&
+            (!isLatencyQuirkEnabled ||
+                (lastRawPlaybackHeadPosition - rawPlaybackHeadPosition >= 0x7FFFFFFFL))) {
+            // The value must have wrapped around.
+            Log.i(TAG,"The playback head position wrapped around");
+            rawPlaybackHeadWrapCount++;
       }
       lastRawPlaybackHeadPosition = rawPlaybackHeadPosition;
       return rawPlaybackHeadPosition + (rawPlaybackHeadWrapCount << 32);
     }
+    // AMZN_CHANGE_END
 
     /**
      * Returns {@link #getPlaybackHeadPosition()} expressed as microseconds.
@@ -788,11 +842,14 @@ public final class AudioTrack {
     private long rawTimestampFramePositionWrapCount;
     private long lastRawTimestampFramePosition;
     private long lastTimestampFramePosition;
-
-    public AudioTrackUtilV19(android.media.AudioTrack audioTrack) {
-      super(audioTrack);
+    // AMZN_CHANGE_BEGIN
+    public AudioTrackUtilV19(android.media.AudioTrack audioTrack,
+                            boolean isLatencyQuirkEnabled,
+                            Method getLatencyMethod) {
+      super(audioTrack,isLatencyQuirkEnabled,getLatencyMethod);
       audioTimestamp = new AudioTimestamp();
     }
+    // AMZN_CHANGE_END
 
     @Override
     public boolean updateTimestamp() {
