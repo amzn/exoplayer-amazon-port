@@ -768,9 +768,13 @@ public final class AudioTrack {
       // if audio track includes latency while returning play head position
       // we try to compensate it back by adding the latency back to it,
       // if the track is in playing state
-      if(isLatencyQuirkEnabled &&
-            audioTrack.getPlayState() == android.media.AudioTrack.PLAYSTATE_PLAYING) {
-        php += getAudioSWLatencies();
+      if (isLatencyQuirkEnabled) {
+        int trackState = audioTrack.getPlayState();
+        if (trackState == android.media.AudioTrack.PLAYSTATE_PLAYING ||
+                (trackState == android.media.AudioTrack.PLAYSTATE_PAUSED &&
+                    php != 0)) {
+            php += getAudioSWLatencies();
+        }
       }
       long rawPlaybackHeadPosition = 0xFFFFFFFFL & php;
       if (lastRawPlaybackHeadPosition > rawPlaybackHeadPosition &&
