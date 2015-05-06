@@ -181,8 +181,17 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer {
   protected boolean isEnded() {
     // We've exhausted the output stream, and the AudioTrack has either played all of the data
     // submitted, or has been fed insufficient data to begin playback.
-    return super.isEnded() && (!audioTrack.hasPendingData()
+    // AMZN_CHANGE_BEGIN
+    boolean ret = super.isEnded();
+    // for dolby passthrough case, we don't need to call hasPendingData &
+    // hasEnoughDataToBeginPlayback to detect end of playback. Instead
+    // we depend only on the codec to flag EOS.
+    if (!audioTrack.isDolbyPassthrough()) {
+      ret &= (!audioTrack.hasPendingData()
         || !audioTrack.hasEnoughDataToBeginPlayback());
+    }
+    return ret;
+    // AMZN_CHANGE_END
   }
 
   @Override

@@ -17,9 +17,12 @@ package com.google.android.exoplayer.audio;
 
 import com.google.android.exoplayer.C;
 import com.google.android.exoplayer.util.Util;
+// AMZN_CHANGE_BEGIN
 import com.google.android.exoplayer.util.Logger;
-import com.google.android.exoplayer.util.AmazonQuirks; // AMZN_CHANGE_ONELINE
-
+import com.google.android.exoplayer.util.AmazonQuirks;
+import com.google.android.exoplayer.audio.DolbyPassthroughAudioTrack;
+import com.google.android.exoplayer.util.MimeTypes;
+// AMZN_CHANGE_END
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.media.AudioFormat;
@@ -28,8 +31,6 @@ import android.media.AudioTimestamp;
 import android.media.MediaFormat;
 import android.os.ConditionVariable;
 import android.util.Log;
-import android.os.Build; // AMZN_CHANGE_ONELINE
-
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 
@@ -151,6 +152,7 @@ public final class AudioTrack {
   private long lastTimestampSampleTimeUs;
 
   private Method getLatencyMethod;
+  private Method getDirectTrackAudioFormat; // AMZN_CHANGE_ONELINE
   private long submittedBytes;
   private int startMediaTimeState;
   private long startMediaTimeUs;
@@ -167,12 +169,13 @@ public final class AudioTrack {
   /** Bitrate measured in kilobits per second, if {@link #isAc3} is true. */
   private int ac3Bitrate;
 
-  private final Logger log = new Logger(Logger.Module.Audio, TAG);
+  private static final Logger log = new Logger(Logger.Module.Audio, TAG); // AMZN_CHANGE_ONELINE
 
   // AMZN_CHANGE_BEGIN
   /** A boolean to enable latency quirk.
   Enabled when getPlayHeadPosition includes audio latencies */
   private boolean isLatencyQuirkEnabled = false;
+  private boolean isDolbyPassthroughQuirkEnabled = false;
   // AMZN_CHANGE_END
 
   public AudioTrack() {
@@ -183,14 +186,30 @@ public final class AudioTrack {
             android.media.AudioTrack.class.getMethod("getLatency", (Class<?>[]) null);
       } catch (NoSuchMethodException e) {
         // There's no guarantee this method exists. Do nothing.
+        log.w("getLatency method not found");
       }
     }
+    // AMZN_CHANGE_BEGIN
+    if (Util.SDK_INT >= 17) {
+        try {
+          getDirectTrackAudioFormat =
+            android.media.AudioTrack.class.getMethod("getDirectTrackAudioFormat",
+                                                        String.class,
+                                                        int.class);
+        } catch (NoSuchMethodException e) {
+          // There's no guarantee this method exists. Do nothing.
+          log.w("getDirectTrackAudioFormat method not found");
+        }
+    }
+    // AMZN_CHANGE_END
     playheadOffsets = new long[MAX_PLAYHEAD_OFFSET_COUNT];
     volume = 1.0f;
     startMediaTimeState = START_NOT_SET;
      // AMZN_CHANGE_BEGIN
     isLatencyQuirkEnabled = AmazonQuirks.isLatencyQuirkEnabled();
     log.i("isLatencyQuirkEnabled = " + isLatencyQuirkEnabled);
+    isDolbyPassthroughQuirkEnabled = AmazonQuirks.isDolbyPassthroughQuirkEnabled();
+    log.i("isDolbyPassthroughQuirkEnabled = " + isDolbyPassthroughQuirkEnabled);
      // AMZN_CHANGE_END
   }
 
@@ -201,6 +220,18 @@ public final class AudioTrack {
   public boolean isInitialized() {
     return audioTrack != null;
   }
+
+  // AMZN_CHANGE_BEGIN
+  // This API is called from MediaCodecAudioTrackRenderer to skip
+  // calling hasPendingData and hasEnoughDataToBeginPlayback to
+  // detect if the playback has ended or not since these APIs
+  // always return true and fake the buffering state of audio track.
+  // there is no way for us to depend on the audio track states to decide
+  // if the playback has ended or not.
+  public boolean isDolbyPassthrough() {
+    return (isAc3 && isDolbyPassthroughQuirkEnabled);
+  }
+  // AMZN_CHANGE_END
 
   /**
    * Returns the playback position in the stream starting at zero, in microseconds, or
@@ -215,40 +246,64 @@ public final class AudioTrack {
    */
   public long getCurrentPositionUs(boolean sourceEnded) {
     if (!hasCurrentPositionUs()) {
+      log.v("getCurrentPositionUs: CURRENT_POSITION_NOT_SET");
       return CURRENT_POSITION_NOT_SET;
     }
-
-    if (audioTrack.getPlayState() == android.media.AudioTrack.PLAYSTATE_PLAYING) {
+    // for dolby passthrough case, we don't need to sync sample
+    // params because we don't depend on play head position for timestamp
+    if (audioTrack.getPlayState() == android.media.AudioTrack.PLAYSTATE_PLAYING
+        && !isDolbyPassthrough() ) { // AMZN_CHANGE_ONELINE
       maybeSampleSyncParams();
     }
 
     long systemClockUs = System.nanoTime() / 1000;
     long currentPositionUs;
-    if (audioTimestampSet) {
+    // AMZN_CHANGE_BEGIN
+    // for dolby passthrough case ,we just depend on getTimeStamp API
+    // for audio video synchronization.
+    if (isDolbyPassthrough()) {
+      audioTimestampSet = audioTrackUtil.updateTimestamp();
+      long audioTimeStamp = audioTrackUtil.getTimestampNanoTime() / 1000;
+      currentPositionUs = audioTimeStamp + startMediaTimeUs;
+      log.v("audioTimeStamp = " + audioTimeStamp +
+            " startMediaTimeUs = " + startMediaTimeUs +
+            " currentPositionUs = " + currentPositionUs);
+    } else if (audioTimestampSet) { // AMZN_CHANGE_END
       // How long ago in the past the audio timestamp is (negative if it's in the future).
       long presentationDiff = systemClockUs - (audioTrackUtil.getTimestampNanoTime() / 1000);
       long framesDiff = durationUsToFrames(presentationDiff);
       // The position of the frame that's currently being presented.
       long currentFramePosition = audioTrackUtil.getTimestampFramePosition() + framesDiff;
       currentPositionUs = framesToDurationUs(currentFramePosition) + startMediaTimeUs;
+      log.v("systemClockUs = " + systemClockUs +
+            " presentationDiff = " + presentationDiff +
+            " framesDiff = " + framesDiff +
+            " currentFramePosition = " + currentFramePosition +
+            " startMediaTimeUs = " + startMediaTimeUs +
+            " currentPositionUs = "+ currentPositionUs);
     } else {
       if (playheadOffsetCount == 0) {
         // The AudioTrack has started, but we don't have any samples to compute a smoothed position.
-        currentPositionUs = audioTrackUtil.getPlaybackHeadPositionUs() + startMediaTimeUs;
+        long playbackHeadPositionUs = audioTrackUtil.getPlaybackHeadPositionUs();
+        currentPositionUs = playbackHeadPositionUs + startMediaTimeUs;
+        log.v("playbackHeadPositionUs = " + playbackHeadPositionUs +
+              " startMediaTimeUs = " + startMediaTimeUs +
+              " currentPositionUs = " + currentPositionUs);
       } else {
         // getPlayheadPositionUs() only has a granularity of ~20ms, so we base the position off the
         // system clock (and a smoothed offset between it and the playhead position) so as to
         // prevent jitter in the reported positions.
+        currentPositionUs = systemClockUs + smoothedPlayheadOffsetUs + startMediaTimeUs;
         log.v("startMediaTimeUs = " + startMediaTimeUs +
             " smoothedPlayheadOffsetUs = " + smoothedPlayheadOffsetUs +
-            " systemClockUs = " + systemClockUs);
-        currentPositionUs = systemClockUs + smoothedPlayheadOffsetUs + startMediaTimeUs;
+            " systemClockUs = " + systemClockUs +
+            " currentPositionUs = " + currentPositionUs);
       }
       if (!sourceEnded) {
         currentPositionUs -= latencyUs;
       }
     }
-    log.v("currentPositionUs = " + currentPositionUs);
+    log.d("currentPositionUs = " + currentPositionUs);
     return currentPositionUs;
   }
 
@@ -269,6 +324,7 @@ public final class AudioTrack {
    * @return The new (or re-used) session identifier.
    */
   public int initialize(int sessionId) throws InitializationException {
+    log.i("initialize: session id = " + sessionId);
     // If we're asynchronously releasing a previous audio track then we block until it has been
     // released. This guarantees that we cannot end up in a state where we have multiple audio
     // track instances. Without this guarantee it would be possible, in extreme cases, to exhaust
@@ -276,18 +332,30 @@ public final class AudioTrack {
     // initialization of the audio track to fail.
     releasingConditionVariable.block();
 
+    // AMZN_CHANGE_BEGIN
     if (sessionId == SESSION_ID_NOT_SET) {
+      if (isDolbyPassthrough()) {
+        audioTrack = new DolbyPassthroughAudioTrack(AudioManager.STREAM_MUSIC, sampleRate,
+          channelConfig, encoding, bufferSize, android.media.AudioTrack.MODE_STREAM);
+      } else {
       audioTrack = new android.media.AudioTrack(AudioManager.STREAM_MUSIC, sampleRate,
           channelConfig, encoding, bufferSize, android.media.AudioTrack.MODE_STREAM);
+      }
     } else {
       // Re-attach to the same audio session.
-      audioTrack = new android.media.AudioTrack(AudioManager.STREAM_MUSIC, sampleRate,
+      if (isDolbyPassthrough()) {
+        audioTrack = new DolbyPassthroughAudioTrack(AudioManager.STREAM_MUSIC, sampleRate,
           channelConfig, encoding, bufferSize, android.media.AudioTrack.MODE_STREAM, sessionId);
+      } else {
+        audioTrack = new android.media.AudioTrack(AudioManager.STREAM_MUSIC, sampleRate,
+          channelConfig, encoding, bufferSize, android.media.AudioTrack.MODE_STREAM, sessionId);
+      }
     }
 
     checkAudioTrackInitialized();
-    // AMZN_CHANGE_BEGIN
-    if (Util.SDK_INT >= 19) {
+    // for dolby passthrough case, we use KK API getTimeStamp because it's
+    // supported for Fire TV devices.
+    if (Util.SDK_INT >= 19 || isDolbyPassthrough()) {
       audioTrackUtil = new AudioTrackUtilV19(audioTrack,
                                                isLatencyQuirkEnabled, getLatencyMethod);
     } else {
@@ -304,7 +372,42 @@ public final class AudioTrack {
    * be {@link AudioFormat#ENCODING_PCM_16BIT}.
    */
   public void reconfigure(MediaFormat format) {
-    reconfigure(format, AudioFormat.ENCODING_PCM_16BIT, 0);
+    // AMZN_CHANGE_BEGIN
+    log.i("reconfigure: format = " + format);
+
+    String mimeType = format.getString(MediaFormat.KEY_MIME);
+    int encoding = -1;
+
+    if (mimeType.equalsIgnoreCase(MimeTypes.AUDIO_EC3) ||
+          mimeType.equalsIgnoreCase(MimeTypes.AUDIO_CUSTOM_EC3)) {
+      encoding = AudioFormat.ENCODING_E_AC3;
+    } else if (mimeType.equalsIgnoreCase(MimeTypes.AUDIO_AC3)) {
+      encoding = AudioFormat.ENCODING_AC3;
+    } else if (mimeType.equalsIgnoreCase(MimeTypes.AUDIO_RAW)) {
+       encoding = AudioFormat.ENCODING_PCM_16BIT;
+    } else {
+        log.e("UNSUPPORTED MIME TYPE");
+    }
+    // if this method is found in AudioTrack,
+    // this device is fire tv. We use this to override the encoding format
+    // because in fire tv we support DirectTrack for Dolby.
+    if (getDirectTrackAudioFormat != null && encoding != -1 &&
+          encoding != AudioFormat.ENCODING_PCM_16BIT) {
+      log.i("Invoking getDirectTrackAudioFormat with mimeType = " + mimeType +
+            " and encoding format = " + encoding);
+      try {
+          encoding  = (Integer) getDirectTrackAudioFormat.invoke(AudioTrack.class,
+                                                                  mimeType, encoding);
+      } catch (Exception e) {
+          log.e("Unable to access getDirectTrackAudioFormat", e);
+      }
+      log.i("We got new encoding format as " + encoding);
+    }
+
+    if(encoding != -1) {
+        reconfigure(format, encoding, 0);
+    }
+    // AMZN_CHANGE_END
   }
 
   /**
@@ -344,7 +447,12 @@ public final class AudioTrack {
     int sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE);
 
     // TODO: Does channelConfig determine channelCount?
-    boolean isAc3 = encoding == AudioFormat.ENCODING_AC3 || encoding == AudioFormat.ENCODING_E_AC3;
+    // AMZN_CHANGE_BEGIN
+    boolean isAc3 =  Util.SDK_INT >= 21 ? (encoding == AudioFormat.ENCODING_AC3 ||
+                                            encoding == AudioFormat.ENCODING_E_AC3) :
+                                           AmazonQuirks.isAc3(encoding);
+    log.i("isAC3 = " + isAc3);
+    // AMZN_CHANGE_END
     if (isInitialized() && this.sampleRate == sampleRate && this.channelConfig == channelConfig
         && !this.isAc3 && !isAc3) {
       // We already have an existing audio track with the correct sample rate and channel config.
@@ -411,7 +519,7 @@ public final class AudioTrack {
    */
   public int handleBuffer(ByteBuffer buffer, int offset, int size, long presentationTimeUs)
       throws WriteException {
-    log.v("handleBuffer : offset = " + offset + " size = " + size +
+    log.d("handleBuffer : offset = " + offset + " size = " + size +
                         " presentationTimeUs = " + presentationTimeUs);
     if (size == 0) {
       return RESULT_BUFFER_CONSUMED;
@@ -426,31 +534,41 @@ public final class AudioTrack {
         int divisor = 1000 * 1536;
         ac3Bitrate = (unscaledAc3Bitrate + divisor / 2) / divisor;
       }
-
-      // This is the first time we've seen this {@code buffer}.
-      // Note: presentationTimeUs corresponds to the end of the sample, not the start.
-      long bufferStartTime = presentationTimeUs - framesToDurationUs(bytesToFrames(size));
-      if (startMediaTimeState == START_NOT_SET) { // AMZN_CHANGE_ONELINE
-        startMediaTimeUs = Math.max(0, bufferStartTime);
-        log.i("Setting StartMediaTimeUs = " + startMediaTimeUs);
-        startMediaTimeState = START_IN_SYNC;
-      } else {
-        // Sanity check that bufferStartTime is consistent with the expected value.
-        long expectedBufferStartTime = startMediaTimeUs
-            + framesToDurationUs(bytesToFrames(submittedBytes));
-        if (startMediaTimeState == START_IN_SYNC
-            && Math.abs(expectedBufferStartTime - bufferStartTime) > 200000) {
-          log.w("Discontinuity detected [expected " + expectedBufferStartTime + ", got "
-              + bufferStartTime + "]");
-          startMediaTimeState = START_NEED_SYNC;
-        }
-        if (startMediaTimeState == START_NEED_SYNC) {
-          // Adjust startMediaTimeUs to be consistent with the current buffer's start time and the
-          // number of bytes submitted.
-          startMediaTimeUs += (bufferStartTime - expectedBufferStartTime);
-          log.i("StartMediaTimeUs recalculated as = " + startMediaTimeUs);
+      // AMZN_CHANGE_BEGIN
+      // for dolby passthrough case we don't want to validate start times
+      // because its not possible to validate it based on submitted bytes.
+      if (isDolbyPassthrough()) {
+        if (startMediaTimeState == START_NOT_SET) {
+          startMediaTimeUs = presentationTimeUs;
+          log.i("Setting StartMediaTimeUs = " + startMediaTimeUs);
           startMediaTimeState = START_IN_SYNC;
-          result |= RESULT_POSITION_DISCONTINUITY;
+        }
+      } else { // AMZN_CHANGE_END
+        // This is the first time we've seen this {@code buffer}.
+        // Note: presentationTimeUs corresponds to the end of the sample, not the start.
+        long bufferStartTime = presentationTimeUs - framesToDurationUs(bytesToFrames(size));
+        if (startMediaTimeState == START_NOT_SET) { // AMZN_CHANGE_ONELINE
+          startMediaTimeUs = Math.max(0, bufferStartTime);
+          log.i("Setting StartMediaTimeUs = " + startMediaTimeUs);
+          startMediaTimeState = START_IN_SYNC;
+        } else {
+          // Sanity check that bufferStartTime is consistent with the expected value.
+          long expectedBufferStartTime = startMediaTimeUs
+              + framesToDurationUs(bytesToFrames(submittedBytes));
+          if (startMediaTimeState == START_IN_SYNC
+              && Math.abs(expectedBufferStartTime - bufferStartTime) > 200000) {
+            log.w("Discontinuity detected [expected " + expectedBufferStartTime + ", got "
+                + bufferStartTime + "]");
+            startMediaTimeState = START_NEED_SYNC;
+          }
+          if (startMediaTimeState == START_NEED_SYNC) {
+            // Adjust startMediaTimeUs to be consistent with the current buffer's start time and the
+            // number of bytes submitted.
+            startMediaTimeUs += (bufferStartTime - expectedBufferStartTime);
+            log.i("StartMediaTimeUs recalculated as = " + startMediaTimeUs);
+            startMediaTimeState = START_IN_SYNC;
+            result |= RESULT_POSITION_DISCONTINUITY;
+          }
         }
       }
     }
@@ -458,7 +576,9 @@ public final class AudioTrack {
     if (temporaryBufferSize == 0) {
       temporaryBufferSize = size;
       buffer.position(offset);
-      if (Util.SDK_INT < 21) {
+      // we need to copy data to temp buffer in case of dolby passthrough also
+      // irrespective of SDK version.
+      if (Util.SDK_INT < 21 || isDolbyPassthrough()) { // AMZN_CHANGE_ONELINE
         // Copy {@code buffer} into {@code temporaryBuffer}.
         if (temporaryBuffer == null || temporaryBuffer.length < size) {
           temporaryBuffer = new byte[size];
@@ -469,7 +589,19 @@ public final class AudioTrack {
     }
 
     int bytesWritten = 0;
-    if (Util.SDK_INT < 21) {
+    // AMZN_CHANGE_BEGIN
+    // for dolby passthrough case, just write into the DolbyPassthroughAudioTrack
+    // since its implementation is different than standard pcm audio track.
+    // The DolbyPassthroughAudioTrack takes care of writing only in play state
+    // and also writes into the track asynchronously. Also, we
+    // cannot depend on playback head position to decide how much more data to write.
+    if (isDolbyPassthrough()) {
+      // if there are no free buffers in AudioTrack, the write returns 0, indicating
+      // it did not consume the buffer.
+      bytesWritten = audioTrack.write(temporaryBuffer, temporaryBufferOffset, size);
+      log.v("Writing to track returned: bytesToWrite = " + size +
+              " bytes Written = " + bytesWritten);
+    } else if (Util.SDK_INT < 21) { // AMZN_CHANGE_END
       // Work out how many bytes we can write without the risk of blocking.
       int bytesPending =
           (int) (submittedBytes - (audioTrackUtil.getPlaybackHeadPosition() * frameSize));
@@ -477,6 +609,8 @@ public final class AudioTrack {
       if (bytesToWrite > 0) {
         bytesToWrite = Math.min(temporaryBufferSize, bytesToWrite);
         bytesWritten = audioTrack.write(temporaryBuffer, temporaryBufferOffset, bytesToWrite);
+        log.v("Writing to track returned: bytesToWrite = " + bytesToWrite +
+              " bytes Written = " + bytesWritten);
         if (bytesWritten >= 0) {
           temporaryBufferOffset += bytesWritten;
         }
@@ -505,15 +639,32 @@ public final class AudioTrack {
 
   /** Returns whether the audio track has more data pending that will be played back. */
   public boolean hasPendingData() {
-    return isInitialized()
-        && bytesToFrames(submittedBytes) > audioTrackUtil.getPlaybackHeadPosition();
+    // AMZN_CHANGE_BEGIN
+    if (!isInitialized()) {
+        return false;
+    }
+    // for dolby passthrough case we always consider that audio track has
+    // buffers to render even though we may not. We don't support buffering
+    // at audio track level for dolby passthrough case.
+    boolean isDataPending = isDolbyPassthrough() ||
+                     (bytesToFrames(submittedBytes) > audioTrackUtil.getPlaybackHeadPosition());
+    log.v("hasPendingData = " + isDataPending);
+    return isDataPending;
+    // AMZN_CHANGE_END
   }
 
   /** Returns whether enough data has been supplied via {@link #handleBuffer} to begin playback. */
   public boolean hasEnoughDataToBeginPlayback() {
     // The value of minBufferSize can be slightly less than what's actually required for playback
     // to start, hence the multiplication factor.
-    return submittedBytes > (minBufferSize * 3) / 2;
+    // AMZN_CHANGE_BEGIN
+    // For dolby passthrough, we always consider that we have buffered data
+    // at the audioTrack even though we may not. We don't support buffering
+    // of data at audio track level to start playback.
+    boolean ret = (isDolbyPassthrough() || (submittedBytes > (minBufferSize * 3) / 2));
+    log.v("hasEnoughDataToBeginPlayback = " + ret);
+    return ret;
+    // AMZN_CHANGE_END
   }
 
   /** Sets the playback volume. */
@@ -765,6 +916,7 @@ public final class AudioTrack {
      */
     public long getPlaybackHeadPosition() {
       int php = audioTrack.getPlaybackHeadPosition();
+      log.v("playbackHeadPosition = " + php);
       // if audio track includes latency while returning play head position
       // we try to compensate it back by adding the latency back to it,
       // if the track is in playing state
@@ -774,6 +926,7 @@ public final class AudioTrack {
                 (trackState == android.media.AudioTrack.PLAYSTATE_PAUSED &&
                     php != 0)) {
             php += getAudioSWLatencies();
+            log.v("latency compensated playbackHeadPosition = " + php);
         }
       }
       long rawPlaybackHeadPosition = 0xFFFFFFFFL & php;
@@ -781,7 +934,7 @@ public final class AudioTrack {
             (!isLatencyQuirkEnabled ||
                 (lastRawPlaybackHeadPosition - rawPlaybackHeadPosition >= 0x7FFFFFFFL))) {
             // The value must have wrapped around.
-            Log.i(TAG,"The playback head position wrapped around");
+            log.i("The playback head position wrapped around");
             rawPlaybackHeadWrapCount++;
       }
       lastRawPlaybackHeadPosition = rawPlaybackHeadPosition;
