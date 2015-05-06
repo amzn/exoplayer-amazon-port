@@ -40,6 +40,7 @@ import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.Display;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
@@ -177,6 +178,22 @@ public class PlayerActivity extends Activity implements SurfaceHolder.Callback, 
     if (view == retryButton) {
       preparePlayer();
     }
+  }
+
+  @Override
+  public boolean onKeyDown(int keyCode, KeyEvent event) {
+    if (keyCode == KeyEvent.KEYCODE_BACK) {
+      finish();
+      return true;
+    }
+    /*
+    The media controller views needs to be showed before it accepts media
+    keys and handles them.
+    Not sure why though. Perhaps it is because it is attached to the root
+    view instead of the video surface view?
+     */
+	toggleControlsVisibility();
+    return super.onKeyDown(keyCode, event);
   }
 
   // Internal methods
