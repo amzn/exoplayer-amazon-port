@@ -20,7 +20,7 @@ import com.google.android.exoplayer.audio.AudioTrack;
 import com.google.android.exoplayer.drm.DrmSessionManager;
 import com.google.android.exoplayer.util.MimeTypes;
 import com.google.android.exoplayer.util.Logger;
-
+import com.google.android.exoplayer.util.AmazonQuirks; // AMZN_CHANGE_ONELINE
 import android.annotation.TargetApi;
 import android.media.MediaCodec;
 import android.media.audiofx.Virtualizer;
@@ -133,7 +133,7 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer {
   @Override
   protected DecoderInfo getDecoderInfo(String mimeType, boolean requiresSecureDecoder)
       throws DecoderQueryException {
-    if (MimeTypes.isPassthroughAudio(mimeType)) {
+    if (!AmazonQuirks.isAmazonDevice() && MimeTypes.isPassthroughAudio(mimeType)) { // AMZN_CHANGE_ONELINE
       return new DecoderInfo(RAW_DECODER_NAME, true);
     }
     return super.getDecoderInfo(mimeType, requiresSecureDecoder);
@@ -175,7 +175,7 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer {
   protected void onOutputFormatChanged(MediaFormat inputFormat,
       android.media.MediaFormat outputFormat) {
     log.i("onOutputFormatChanged: inputFormat = " + inputFormat + " outputFormat = " + outputFormat);
-    if (MimeTypes.isPassthroughAudio(inputFormat.mimeType)) {
+    if (!AmazonQuirks.isAmazonDevice() && MimeTypes.isPassthroughAudio(inputFormat.mimeType)) { // AMZN_CHANGE_ONELINE
       audioTrack.reconfigure(inputFormat.getFrameworkMediaFormatV16());
     } else {
       audioTrack.reconfigure(outputFormat);
@@ -214,8 +214,17 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer {
   protected boolean isEnded() {
     // We've exhausted the output stream, and the AudioTrack has either played all of the data
     // submitted, or has been fed insufficient data to begin playback.
-    return super.isEnded() && (!audioTrack.hasPendingData()
+    // AMZN_CHANGE_BEGIN
+    boolean ret = super.isEnded();
+    // for dolby passthrough case, we don't need to call hasPendingData &
+    // hasEnoughDataToBeginPlayback to detect end of playback. Instead
+    // we depend only on the codec to flag EOS.
+    if (!audioTrack.isDolbyPassthroughQuirkEnabled()) {
+      ret &= (!audioTrack.hasPendingData()
         || !audioTrack.hasEnoughDataToBeginPlayback());
+    }
+    return ret;
+    // AMZN_CHANGE_END
   }
 
   @Override
