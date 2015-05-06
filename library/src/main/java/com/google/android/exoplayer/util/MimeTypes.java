@@ -49,6 +49,7 @@ public final class MimeTypes {
   public static final String AUDIO_RAW = BASE_TYPE_AUDIO + "/raw";
   public static final String AUDIO_AC3 = BASE_TYPE_AUDIO + "/ac3";
   public static final String AUDIO_EC3 = BASE_TYPE_AUDIO + "/eac3";
+  public static final String AUDIO_CUSTOM_EC3 = BASE_TYPE_AUDIO + "/ec3";
 
   public static final String AUDIO_VORBIS = BASE_TYPE_AUDIO + "/vorbis";
   public static final String AUDIO_OPUS = BASE_TYPE_AUDIO + "/opus";
@@ -141,7 +142,7 @@ public final class MimeTypes {
     if (AUDIO_AC3.equals(mimeType)) {
       return C.ENCODING_AC3;
     }
-    if (AUDIO_EC3.equals(mimeType)) {
+    if (AUDIO_EC3.equals(mimeType) || AUDIO_CUSTOM_EC3.equals(mimeType)) {
       return C.ENCODING_E_AC3;
     }
 
