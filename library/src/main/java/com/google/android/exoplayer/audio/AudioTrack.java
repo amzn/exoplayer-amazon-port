@@ -285,7 +285,10 @@ public final class AudioTrack {
     // for audio video synchronization.
     if (isDolbyPassthroughQuirkEnabled()) {
       audioTimestampSet = audioTrackUtil.updateTimestamp();
-      long audioTimeStamp = audioTrackUtil.getTimestampNanoTime() / 1000;
+      long audioTimeStamp = 0;
+      if (audioTimestampSet) {
+        audioTimeStamp = audioTrackUtil.getTimestampNanoTime() / 1000;
+      }
       currentPositionUs = audioTimeStamp + startMediaTimeUs;
       log.v("audioTimeStamp = " + audioTimeStamp +
             " startMediaTimeUs = " + startMediaTimeUs +
