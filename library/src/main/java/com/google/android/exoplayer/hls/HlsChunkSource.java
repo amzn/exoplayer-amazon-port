@@ -145,15 +145,32 @@ public class HlsChunkSource {
   private byte[] encryptionKey;
   private String encryptionIvString;
   private byte[] encryptionIv;
-
+  //AMZN_CHANGE_BEGIN
+  public HlsChunkSource(DataSource dataSource, String playlistUrl, HlsPlaylist playlist,
+      BandwidthMeter bandwidthMeter, int[] variantIndices, int adaptiveMode,
+      AudioCapabilities audioCapabilities, int initialBitrate) {
+    this(dataSource, playlistUrl, playlist, bandwidthMeter, variantIndices, adaptiveMode,
+        DEFAULT_MIN_BUFFER_TO_SWITCH_UP_MS, DEFAULT_MAX_BUFFER_TO_SWITCH_DOWN_MS,
+        audioCapabilities, initialBitrate);
+  }
+  //AMZN_CHANGE_END
   public HlsChunkSource(DataSource dataSource, String playlistUrl, HlsPlaylist playlist,
       BandwidthMeter bandwidthMeter, int[] variantIndices, int adaptiveMode,
       AudioCapabilities audioCapabilities) {
     this(dataSource, playlistUrl, playlist, bandwidthMeter, variantIndices, adaptiveMode,
         DEFAULT_MIN_BUFFER_TO_SWITCH_UP_MS, DEFAULT_MAX_BUFFER_TO_SWITCH_DOWN_MS,
-        audioCapabilities);
+        audioCapabilities, 0); //AMZN_CHANGE_ONELINE
   }
-
+  //AMZN_CHANGE_BEGIN
+  public HlsChunkSource(DataSource dataSource, String playlistUrl, HlsPlaylist playlist,
+      BandwidthMeter bandwidthMeter, int[] variantIndices, int adaptiveMode,
+      long minBufferDurationToSwitchUpMs, long maxBufferDurationToSwitchDownMs,
+      AudioCapabilities audioCapabilities) {
+      this(dataSource, playlistUrl, playlist, bandwidthMeter, variantIndices, adaptiveMode,
+        minBufferDurationToSwitchUpMs, maxBufferDurationToSwitchDownMs,
+        audioCapabilities, 0);
+  }
+  //AMZN_CHANGE_END
   /**
    * @param dataSource A {@link DataSource} suitable for loading the media data.
    * @param playlistUrl The playlist URL.
@@ -171,11 +188,14 @@ public class HlsChunkSource {
    *     for a switch to a lower quality variant to be considered.
    * @param audioCapabilities The audio capabilities for playback on this device, or {@code null} if
    *     the default capabilities should be assumed.
+   * @param initialBitrate The bitrate (bits per second) that should be considered for initial variant selection.
+   *     If bitrate is 0, it fallsback to default behaviour.
+   *     This overrides the default behaviour of selecting the first variant in the playlist.
    */
   public HlsChunkSource(DataSource dataSource, String playlistUrl, HlsPlaylist playlist,
       BandwidthMeter bandwidthMeter, int[] variantIndices, int adaptiveMode,
       long minBufferDurationToSwitchUpMs, long maxBufferDurationToSwitchDownMs,
-      AudioCapabilities audioCapabilities) {
+      AudioCapabilities audioCapabilities, int initialBitrate) { //AMZN_CHANGE_ONELINE
     this.dataSource = dataSource;
     this.bandwidthMeter = bandwidthMeter;
     this.adaptiveMode = adaptiveMode;
@@ -202,14 +222,24 @@ public class HlsChunkSource {
       variantBlacklistTimes = new long[variants.length];
       int maxWidth = -1;
       int maxHeight = -1;
-      // Select the variant that comes first in their original order in the master playlist.
-      int minOriginalVariantIndex = Integer.MAX_VALUE;
-      for (int i = 0; i < variants.length; i++) {
-        int originalVariantIndex = masterPlaylistVariants.indexOf(variants[i]);
-        if (originalVariantIndex < minOriginalVariantIndex) {
-          minOriginalVariantIndex = originalVariantIndex;
-          selectedVariantIndex = i;
+      // AMZN_CHANGE_BEGIN
+      // If initialBitrate is set, select the variant from the master playlist that's enabled
+      // and satisfies initial bitrate criteria.
+      if (initialBitrate > 0) {
+        selectedVariantIndex = getVariantIndexForBandwidthInner( initialBitrate );
+      } else {
+        // OR Select the first variant from the master playlist that's enabled.
+        int minOriginalVariantIndex = Integer.MAX_VALUE;
+        for (int i = 0; i < variants.length; i++) {
+          int originalVariantIndex = masterPlaylistVariants.indexOf(variants[i]);
+          if (originalVariantIndex < minOriginalVariantIndex) {
+            minOriginalVariantIndex = originalVariantIndex;
+            selectedVariantIndex = i;
+          }
         }
+      }
+      // find max width and max height of the enabled formats
+      for (int i = 0; i < variants.length; i++) {
         Format variantFormat = variants[i].format;
         maxWidth = Math.max(variantFormat.width, maxWidth);
         maxHeight = Math.max(variantFormat.height, maxHeight);
@@ -480,6 +510,16 @@ public class HlsChunkSource {
       bitrateEstimate = 0;
     }
     int effectiveBitrate = (int) (bitrateEstimate * BANDWIDTH_FRACTION);
+    return getVariantIndexForBandwidthInner( effectiveBitrate ); // AMZN_CHANGE_ONELINE: behavior extracted to separate function.
+  }
+
+  //AMZN_CHANGE_BEGIN
+  // This helper function does exactly the same as the original google version, except it
+  // does not use the variable BANDWIDTH_FRACTION to decrease the expectation, but returns the
+  // first real matching value. Now this inner function can be directly called where we do not want
+  // to use the BANDWIDTH_FRACTION decrease.
+  private int getVariantIndexForBandwidthInner( int effectiveBitrate )
+  {
     int lowestQualityEnabledVariantIndex = -1;
     for (int i = 0; i < variants.length; i++) {
       if (variantBlacklistTimes[i] == 0) {
@@ -493,6 +533,8 @@ public class HlsChunkSource {
     Assertions.checkState(lowestQualityEnabledVariantIndex != -1);
     return lowestQualityEnabledVariantIndex;
   }
+  //AMZN_CHANGE_END
+
 
   private boolean shouldRerequestMediaPlaylist(int nextVariantIndex) {
     // Don't re-request media playlist more often than one-half of the target duration.
