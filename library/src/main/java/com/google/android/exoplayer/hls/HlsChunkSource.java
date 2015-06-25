@@ -140,15 +140,32 @@ public class HlsChunkSource {
   private byte[] encryptionKey;
   private String encryptionIvString;
   private byte[] encryptionIv;
-
+  //AMZN_CHANGE_BEGIN
+  public HlsChunkSource(DataSource dataSource, String playlistUrl, HlsPlaylist playlist,
+      BandwidthMeter bandwidthMeter, int[] variantIndices, int adaptiveMode,
+      AudioCapabilities audioCapabilities, int initialBitrate) {
+    this(dataSource, playlistUrl, playlist, bandwidthMeter, variantIndices, adaptiveMode,
+        DEFAULT_MIN_BUFFER_TO_SWITCH_UP_MS, DEFAULT_MAX_BUFFER_TO_SWITCH_DOWN_MS,
+        audioCapabilities, initialBitrate);
+  }
+  //AMZN_CHANGE_END
   public HlsChunkSource(DataSource dataSource, String playlistUrl, HlsPlaylist playlist,
       BandwidthMeter bandwidthMeter, int[] variantIndices, int adaptiveMode,
       AudioCapabilities audioCapabilities) {
     this(dataSource, playlistUrl, playlist, bandwidthMeter, variantIndices, adaptiveMode,
         DEFAULT_MIN_BUFFER_TO_SWITCH_UP_MS, DEFAULT_MAX_BUFFER_TO_SWITCH_DOWN_MS,
-        audioCapabilities);
+        audioCapabilities, 0); //AMZN_CHANGE_ONELINE
   }
-
+  //AMZN_CHANGE_BEGIN
+  public HlsChunkSource(DataSource dataSource, String playlistUrl, HlsPlaylist playlist,
+      BandwidthMeter bandwidthMeter, int[] variantIndices, int adaptiveMode,
+      long minBufferDurationToSwitchUpMs, long maxBufferDurationToSwitchDownMs,
+      AudioCapabilities audioCapabilities) {
+      this(dataSource, playlistUrl, playlist, bandwidthMeter, variantIndices, adaptiveMode,
+        minBufferDurationToSwitchUpMs, maxBufferDurationToSwitchDownMs,
+        audioCapabilities, 0);
+  }
+  //AMZN_CHANGE_END
   /**
    * @param dataSource A {@link DataSource} suitable for loading the media data.
    * @param playlistUrl The playlist URL.
@@ -166,11 +183,14 @@ public class HlsChunkSource {
    *     for a switch to a lower quality variant to be considered.
    * @param audioCapabilities The audio capabilities for playback on this device, or {@code null} if
    *     the default capabilities should be assumed.
+   * @param initialBitrate The bitrate (bits per second) that should be considered for initial variant selection.
+   *     If bitrate is 0, it fallsback to default behaviour.
+   *     This overrides the default behaviour of selecting the first variant in the playlist.
    */
   public HlsChunkSource(DataSource dataSource, String playlistUrl, HlsPlaylist playlist,
       BandwidthMeter bandwidthMeter, int[] variantIndices, int adaptiveMode,
       long minBufferDurationToSwitchUpMs, long maxBufferDurationToSwitchDownMs,
-      AudioCapabilities audioCapabilities) {
+      AudioCapabilities audioCapabilities, int initialBitrate) { //AMZN_CHANGE_ONELINE
     this.dataSource = dataSource;
     this.bandwidthMeter = bandwidthMeter;
     this.adaptiveMode = adaptiveMode;
@@ -199,17 +219,28 @@ public class HlsChunkSource {
 
     int maxWidth = -1;
     int maxHeight = -1;
-    // Select the first variant from the master playlist that's enabled.
-    int minEnabledVariantIndex = Integer.MAX_VALUE;
-    for (int i = 0; i < enabledFormats.length; i++) {
-      int variantIndex = getVariantIndex(enabledFormats[i]);
-      if (variantIndex < minEnabledVariantIndex) {
-        minEnabledVariantIndex = variantIndex;
-        formatIndex = i;
+    // AMZN_CHANGE_BEGIN
+    // If initialBitrate is set, select the variant from the master playlist that's enabled
+    // and satisfies initial bitrate criteria.
+    if (initialBitrate > 0) {
+      formatIndex = getFormatIndexForBandwidth((int) (initialBitrate));
+    } else {
+      // Or select the first variant from the master playlist that's enabled.
+      int minEnabledVariantIndex = Integer.MAX_VALUE;
+      for (int i = 0; i < enabledFormats.length; i++) {
+        int variantIndex = getVariantIndex(enabledFormats[i]);
+        if (variantIndex < minEnabledVariantIndex) {
+          minEnabledVariantIndex = variantIndex;
+          formatIndex = i;
+        }
       }
-      maxWidth = Math.max(enabledFormats[i].width, maxWidth);
-      maxHeight = Math.max(enabledFormats[i].height, maxHeight);
     }
+    // find max width and max height of the enabled formats
+    for (int i = 0; i < enabledFormats.length; i++) {
+       maxWidth = Math.max(enabledFormats[i].width, maxWidth);
+       maxHeight = Math.max(enabledFormats[i].height, maxHeight);
+    }
+    // AMZN_CHANGE_END
     // TODO: We should allow the default values to be passed through the constructor.
     this.maxWidth = maxWidth > 0 ? maxWidth : 1920;
     this.maxHeight = maxHeight > 0 ? maxHeight : 1080;
