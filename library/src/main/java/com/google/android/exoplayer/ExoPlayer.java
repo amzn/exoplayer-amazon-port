@@ -112,6 +112,28 @@ public interface ExoPlayer {
 
     private Factory() {}
 
+    //AMZN_CHANGE_BEGIN
+    /**
+     * Obtains an {@link ExoPlayer} instance.
+     * <p>
+     * Must be invoked from a thread that has an associated {@link Looper}.
+     *
+     * @param rendererCount The number of {@link TrackRenderer}s that will be passed to
+     *     {@link #prepare(TrackRenderer[])}.
+     * @param minBufferMs A minimum duration of data that must be buffered for playback to start
+     *     or resume following a user action such as a seek.
+     * @param minRebufferMs A minimum duration of data that must be buffered for playback to resume
+     *     after a player invoked rebuffer (i.e. a rebuffer that occurs due to buffer depletion, and
+     *     not due to a user action such as starting playback or seeking).
+     * @param eventClbkLooper The looper on which exo player's event callbacks (such as state change,
+     *     error, playWhenReadyCommitted etc) will be issued. If it is null, the
+     *     callback will be issued on the application's main looper instead.
+     */
+    public static ExoPlayer newInstance(int rendererCount, int minBufferMs, int minRebufferMs, Looper eventClbkLooper) {
+      return new ExoPlayerImpl(rendererCount, minBufferMs, minRebufferMs, eventClbkLooper);
+    }
+    //AMZN_CHANGE_END
+
     /**
      * Obtains an {@link ExoPlayer} instance.
      * <p>
