@@ -39,6 +39,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
   private int playbackState;
   private int pendingPlayWhenReadyAcks;
 
+  //AMZN_CHANGE_BEGIN
   /**
    * Constructs an instance. Must be invoked from a thread that has an associated {@link Looper}.
    *
@@ -52,6 +53,25 @@ import java.util.concurrent.CopyOnWriteArraySet;
    */
   @SuppressLint("HandlerLeak")
   public ExoPlayerImpl(int rendererCount, int minBufferMs, int minRebufferMs) {
+    this(rendererCount, minBufferMs, minRebufferMs, null);
+  }
+
+  /**
+   * Constructs an instance. Must be invoked from a thread that has an associated {@link Looper}.
+   *
+   * @param rendererCount The number of {@link TrackRenderer}s that will be passed to
+   *     {@link #prepare(TrackRenderer[])}.
+   * @param minBufferMs A minimum duration of data that must be buffered for playback to start
+   *     or resume following a user action such as a seek.
+   * @param minRebufferMs A minimum duration of data that must be buffered for playback to resume
+   *     after a player invoked rebuffer (i.e. a rebuffer that occurs due to buffer depletion, and
+   *     not due to a user action such as starting playback or seeking).
+   * @param eventHandlerClbkLooper The looper on which exo player's event callbacks (such as state change,
+   *     error, playWhenReadyCommitted etc) will be issued. If it is null, the
+   *     callback will be issued on the application's main looper instead.
+   */
+  @SuppressLint("HandlerLeak")
+  public ExoPlayerImpl(int rendererCount, int minBufferMs, int minRebufferMs, Looper eventHandlerClbkLooper) {
     Log.i(TAG, "Init " + ExoPlayerLibraryInfo.VERSION);
     this.playWhenReady = false;
     this.playbackState = STATE_IDLE;
@@ -60,15 +80,25 @@ import java.util.concurrent.CopyOnWriteArraySet;
     for (int i = 0; i < rendererEnabledFlags.length; i++) {
       rendererEnabledFlags[i] = true;
     }
-    eventHandler = new Handler() {
-      @Override
-      public void handleMessage(Message msg) {
-        ExoPlayerImpl.this.handleEvent(msg);
-      }
-    };
+    if(eventHandlerClbkLooper != null) {
+      eventHandler = new Handler(eventHandlerClbkLooper) {
+        @Override
+        public void handleMessage(Message msg) {
+          ExoPlayerImpl.this.handleEvent(msg);
+        }
+      };
+    } else {
+      eventHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+          ExoPlayerImpl.this.handleEvent(msg);
+        }
+      };
+    }
     internalPlayer = new ExoPlayerImplInternal(eventHandler, playWhenReady, rendererEnabledFlags,
         minBufferMs, minRebufferMs);
   }
+  //AMZN_CHANGE_END
 
   @Override
   public Looper getPlaybackLooper() {
