@@ -1030,4 +1030,28 @@ public abstract class MediaCodecTrackRenderer extends TrackRenderer {
         && "OMX.rk.video_decoder.avc".equals(name);
   }
 
+  //AMZN_CHANGE_BEGIN
+  //The specific media renderer subclasses (Audio/Video) will update these values.
+  public int getRenderedOutputBufferCount() {
+    return codecCounters.renderedOutputBufferCount;
+  }
+  public int getDroppedOutputBufferCount() {
+    return codecCounters.droppedOutputBufferCount;
+  }
+  public int getSkippedOutputBufferCount() {
+    return codecCounters.skippedOutputBufferCount;
+  }
+  public int getOutputBuffersChangedCount() {
+    return codecCounters.outputBuffersChangedCount;
+  }
+  public int getOutputFormatChangedCount() {
+    return codecCounters.outputFormatChangedCount;
+  }
+  public int getCodecReleaseCount() {
+    return codecCounters.codecReleaseCount;
+  }
+  public int getCodecInitCount() {
+    return codecCounters.codecInitCount;
+  }
+  //AMZN_CHANGE_END
 }
