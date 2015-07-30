@@ -570,8 +570,10 @@ public class HlsChunkSource {
     Uri mediaPlaylistUri = UriUtil.resolveToUri(baseUri, variants[variantIndex].url);
     DataSpec dataSpec = new DataSpec(mediaPlaylistUri, 0, C.LENGTH_UNBOUNDED, null,
         DataSpec.FLAG_ALLOW_GZIP);
+    //AMZN_CHANGE_BEGIN
     return new MediaPlaylistChunk(dataSource, dataSpec, scratchSpace, playlistParser, variantIndex,
-        mediaPlaylistUri.toString());
+        mediaPlaylistUri.toString(), variants[variantIndex].getFormat());
+    //AMZN_CHANGE_END
   }
 
   private EncryptionKeyChunk newEncryptionKeyChunk(Uri keyUri, String iv, int variantIndex) {
@@ -723,14 +725,21 @@ public class HlsChunkSource {
 
     private HlsMediaPlaylist result;
 
+    //AMZN_CHANGE_BEGIN
     public MediaPlaylistChunk(DataSource dataSource, DataSpec dataSpec, byte[] scratchSpace,
         HlsPlaylistParser playlistParser, int variantIndex, String playlistUrl) {
-      super(dataSource, dataSpec, Chunk.TYPE_MANIFEST, Chunk.TRIGGER_UNSPECIFIED, null,
+      this(dataSource, dataSpec, scratchSpace, playlistParser, variantIndex, playlistUrl, null);
+    }
+
+    public MediaPlaylistChunk(DataSource dataSource, DataSpec dataSpec, byte[] scratchSpace,
+                              HlsPlaylistParser playlistParser, int variantIndex, String playlistUrl, Format format) {
+      super(dataSource, dataSpec, Chunk.TYPE_MANIFEST, Chunk.TRIGGER_UNSPECIFIED, format,
           Chunk.NO_PARENT_ID, scratchSpace);
       this.variantIndex = variantIndex;
       this.playlistParser = playlistParser;
       this.playlistUrl = playlistUrl;
     }
+    //AMZN_CHANGE_END
 
     @Override
     protected void consume(byte[] data, int limit) throws IOException {
