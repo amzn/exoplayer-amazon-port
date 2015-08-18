@@ -136,6 +136,12 @@ public class MediaCodecUtil {
     for (int i = 0; i < numberOfCodecs; i++) {
       MediaCodecInfo info = mediaCodecList.getCodecInfoAt(i);
       String codecName = info.getName();
+      //AMZN_CHANGE_BEGIN
+      if(!info.isEncoder() && AmazonQuirks.isDecoderBlacklisted(codecName)) {
+        Log.w(TAG, "Decoder is blacklisted on this device. Ignoring= " + codecName);
+        continue;
+      }
+      //AMZN_CHANGE_END
       if (!info.isEncoder() && codecName.startsWith("OMX.")
           && (secureDecodersExplicit || !codecName.endsWith(".secure"))) {
         String[] supportedTypes = info.getSupportedTypes();
