@@ -15,6 +15,7 @@
  */
 package com.google.android.exoplayer;
 
+import com.google.android.exoplayer.util.AmazonQuirks;
 import com.google.android.exoplayer.util.Assertions;
 import com.google.android.exoplayer.util.MimeTypes;
 import com.google.android.exoplayer.util.Util;
@@ -171,6 +172,11 @@ public final class MediaCodecUtil {
    */
   private static boolean isCodecUsableDecoder(MediaCodecInfo info, String name,
       boolean secureDecodersExplicit) {
+    //AMZN_CHANGE_BEGIN
+    if(!info.isEncoder() && AmazonQuirks.isDecoderBlacklisted(name)) {
+      Log.w(TAG, "Decoder is blacklisted on this device. Ignoring= " + name);
+      return false;
+    }//AMZN_CHANGE_END
     if (info.isEncoder() || (!secureDecodersExplicit && name.endsWith(".secure"))) {
       return false;
     }
