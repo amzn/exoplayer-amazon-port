@@ -74,6 +74,15 @@ import android.util.Log;
              ( DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN1_DEVICE_MODEL) ||
                                DEVICEMODEL.equalsIgnoreCase(FIRETV_STICK_DEVICE_MODEL) ));
   }
+  public static boolean isDecoderBlacklisted(String codecName) {
+     if(!isAmazonDevice()) {
+         return false;
+     }
+     if(isFireTVGen2() && codecName.startsWith("OMX.MTK.AUDIO.DECODER.MP3")) {
+         return true;
+     }
+     return false;
+  }
 
   public static boolean isFireTVGen2() {
     return ( isAmazonDevice() &&
