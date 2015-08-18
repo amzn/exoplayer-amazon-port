@@ -23,8 +23,9 @@ import com.google.android.exoplayer.util.Util;
 import com.google.android.exoplayer.util.MimeTypes;
 import android.util.Log;
  public class AmazonQuirks {
-  private static final String FIRETV_DEVICE_MODEL = "AFTB";
+  private static final String FIRETV_GEN1_DEVICE_MODEL = "AFTB";
   private static final String FIRETV_STICK_DEVICE_MODEL = "AFTM";
+  private static final String FIRETV_GEN2_DEVICE_MODEL = "AFTS";
   private static final String AMAZON = "Amazon";
   private static final String DEVICEMODEL = Build.MODEL;
   private static final String MANUFACTURER = Build.MANUFACTURER;
@@ -74,8 +75,20 @@ import android.util.Log;
 
   public static boolean isFireTVFamily() {
     Log.d("AMZNQUIRK",DEVICEMODEL);
-    return ( DEVICEMODEL.equalsIgnoreCase(FIRETV_DEVICE_MODEL) ||
-                               DEVICEMODEL.equalsIgnoreCase(FIRETV_STICK_DEVICE_MODEL) );
+    //TODO: should probably also check isAmazonDevice
+    //Note: don't put gen2 here as it will enable dobly quirks for it!
+    return ( DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN1_DEVICE_MODEL)
+            || DEVICEMODEL.equalsIgnoreCase(FIRETV_STICK_DEVICE_MODEL) );
+  }
+  public static boolean isDecoderBlacklisted(String codecName) {
+     if(!isAmazonDevice()) {
+         return false;
+     }
+     if(DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN2_DEVICE_MODEL)
+             && codecName.startsWith("OMX.MTK.AUDIO.DECODER.MP3")) {
+         return true;
+     }
+     return false;
   }
 
  }
