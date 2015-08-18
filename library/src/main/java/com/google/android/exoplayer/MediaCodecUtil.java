@@ -182,6 +182,11 @@ public final class MediaCodecUtil {
    */
   private static boolean isCodecUsableDecoder(MediaCodecInfo info, String name,
       boolean secureDecodersExplicit) {
+    //AMZN_CHANGE_BEGIN
+    if(!info.isEncoder() && AmazonQuirks.isDecoderBlacklisted(name)) {
+      Log.w(TAG, "Decoder is blacklisted on this device. Ignoring= " + name);
+      return false;
+    }//AMZN_CHANGE_END
     if (info.isEncoder() || (!secureDecodersExplicit && name.endsWith(".secure"))) {
       return false;
     }
