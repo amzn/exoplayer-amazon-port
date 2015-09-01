@@ -69,7 +69,7 @@ public final class Mp3Extractor implements Extractor {
 
   private Seeker seeker;
   private long basisTimeUs;
-  private int samplesRead;
+  private long samplesRead; // AMZN_CHANGE_ONELINE: int overflow after 48695 seconds. See FTVVIZ-976
   private int sampleBytesRemaining;
 
   /** Constructs a new {@link Mp3Extractor}. */
