@@ -61,7 +61,7 @@ public final class Mp3Extractor implements Extractor {
 
   private Seeker seeker;
   private long basisTimeUs;
-  private int samplesRead;
+  private long samplesRead; // AMZN_CHANGE_ONELINE: int overflow after 48695 seconds with sample rate of 44100 Hz. See FTVVIZ-976
   private int sampleBytesRemaining;
 
   /**
