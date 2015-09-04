@@ -133,7 +133,7 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer {
   @Override
   protected DecoderInfo getDecoderInfo(String mimeType, boolean requiresSecureDecoder)
       throws DecoderQueryException {
-    if (!AmazonQuirks.isAmazonDevice() && MimeTypes.isPassthroughAudio(mimeType)) { // AMZN_CHANGE_ONELINE
+    if (AmazonQuirks.useDefaultPassthroughDecoder() && MimeTypes.isPassthroughAudio(mimeType)) { // AMZN_CHANGE_ONELINE
       return new DecoderInfo(RAW_DECODER_NAME, true);
     }
     return super.getDecoderInfo(mimeType, requiresSecureDecoder);
@@ -175,7 +175,7 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer {
   protected void onOutputFormatChanged(MediaFormat inputFormat,
       android.media.MediaFormat outputFormat) {
     log.i("onOutputFormatChanged: inputFormat = " + inputFormat + " outputFormat = " + outputFormat);
-    if (!AmazonQuirks.isAmazonDevice() && MimeTypes.isPassthroughAudio(inputFormat.mimeType)) { // AMZN_CHANGE_ONELINE
+    if (AmazonQuirks.useDefaultPassthroughDecoder() && MimeTypes.isPassthroughAudio(inputFormat.mimeType)) { // AMZN_CHANGE_ONELINE
       audioTrack.reconfigure(inputFormat.getFrameworkMediaFormatV16());
     } else {
       audioTrack.reconfigure(outputFormat);

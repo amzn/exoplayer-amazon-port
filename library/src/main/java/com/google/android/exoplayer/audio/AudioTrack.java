@@ -571,7 +571,7 @@ public final class AudioTrack {
       // AMZN_CHANGE_BEGIN
       // for dolby passthrough case we don't want to validate start times
       // because its not possible to validate it based on submitted bytes.
-      if (isDolbyPassthroughQuirkEnabled()) {
+      if (isAc3) {
         if (startMediaTimeState == START_NOT_SET) {
           startMediaTimeUs = presentationTimeUs;
           log.i("Setting StartMediaTimeUs = " + startMediaTimeUs);

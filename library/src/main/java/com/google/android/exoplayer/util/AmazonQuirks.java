@@ -23,6 +23,7 @@ import com.google.android.exoplayer.util.Util;
 import com.google.android.exoplayer.util.MimeTypes;
 import android.util.Log;
  public class AmazonQuirks {
+  private static final String TAG = AmazonQuirks.class.getSimpleName();
   private static final String FIRETV_GEN1_DEVICE_MODEL = "AFTB";
   private static final String FIRETV_STICK_DEVICE_MODEL = "AFTM";
   private static final String FIRETV_GEN2_DEVICE_MODEL = "AFTS";
@@ -30,10 +31,6 @@ import android.util.Log;
   private static final String DEVICEMODEL = Build.MODEL;
   private static final String MANUFACTURER = Build.MANUFACTURER;
   private static final int AUDIO_HARDWARE_LATENCY_FOR_TABLETS = 90000;
-  // The audio format values for Dolby passthrough in Fire TV (Gen 1) family
-  // is different than the ones defined in API 21.
-  public static final int AUDIO_FORMAT_LEGACY_ENCODING_AC3 = 107;
-  public static final int AUDIO_FORMAT_LEGACY_ENCODING_EAC3 = 108;
 
   public static boolean isAdaptive(String mimeType) {
     if (mimeType == null || mimeType.isEmpty()) {
@@ -60,13 +57,7 @@ import android.util.Log;
 
   public static boolean isDolbyPassthroughQuirkEnabled() {
     // Sets dolby passthrough quirk for Amazon Fire TV (Gen 1) Family
-    return isAmazonDevice() && isFireTVFamily();
-  }
-
-  public static boolean isAc3(int encoding) {
-    return ( isDolbyPassthroughQuirkEnabled() &&
-             (encoding == AUDIO_FORMAT_LEGACY_ENCODING_AC3 ||
-                encoding == AUDIO_FORMAT_LEGACY_ENCODING_EAC3) );
+    return isFireTVGen1Family();
   }
 
   public static boolean isAmazonDevice(){
@@ -74,21 +65,36 @@ import android.util.Log;
   }
 
   public static boolean isFireTVFamily() {
-    Log.d("AMZNQUIRK",DEVICEMODEL);
-    //TODO: should probably also check isAmazonDevice
-    //Note: don't put gen2 here as it will enable dobly quirks for it!
-    return ( DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN1_DEVICE_MODEL)
-            || DEVICEMODEL.equalsIgnoreCase(FIRETV_STICK_DEVICE_MODEL));
+    return ( isFireTVGen1Family() || isFireTVGen2() );
   }
+
+  public static boolean isFireTVGen1Family() {
+    return ( isAmazonDevice() &&
+             ( DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN1_DEVICE_MODEL) ||
+                               DEVICEMODEL.equalsIgnoreCase(FIRETV_STICK_DEVICE_MODEL) ));
+  }
+
+  public static boolean isFireTVGen2() {
+    return ( isAmazonDevice() &&
+             DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN2_DEVICE_MODEL) );
+  }
+
   public static boolean isDecoderBlacklisted(String codecName) {
       if(!isAmazonDevice()) {
           return false;
       }
-      if(DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN2_DEVICE_MODEL)
-              && codecName.startsWith("OMX.MTK.AUDIO.DECODER.MP3")) {
+      if(isFireTVGen2() && codecName.startsWith("OMX.MTK.AUDIO.DECODER.MP3")) {
           return true;
       }
       return false;
   }
 
+  public static boolean useDefaultPassthroughDecoder() {
+    if (!isAmazonDevice() || isFireTVGen2() ) {
+      Log.i(TAG,"using default Dolby pass-through decoder");
+      return true;
+    }
+    Log.i(TAG,"using platform Dolby decoder");
+    return false;
+  }
  }
