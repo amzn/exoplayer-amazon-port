@@ -33,6 +33,7 @@ import com.google.android.exoplayer.util.Assertions;
 
 import android.os.Handler;
 import android.os.SystemClock;
+import android.util.Log;
 
 import java.io.IOException;
 import java.util.LinkedList;
@@ -341,7 +342,8 @@ public class HlsSampleSource implements SampleSource, Loader.Callback {
     long now = SystemClock.elapsedRealtime();
     long loadDurationMs = now - currentLoadStartTimeMs;
     chunkSource.onChunkLoadCompleted(currentLoadable);
-    if (isTsChunk(currentLoadable)) {
+    boolean isCurrentLoadableTsChunk = isTsChunk(currentLoadable); //AMZN_CHANGE_ONELINE
+    if (isCurrentLoadableTsChunk) { //AMZN_CHANGE_ONELINE
       TsChunk tsChunk = (TsChunk) loadable;
       loadingFinished = tsChunk.isLastChunk;
       notifyLoadCompleted(currentLoadable.bytesLoaded(), tsChunk.type, tsChunk.trigger,
@@ -356,6 +358,12 @@ public class HlsSampleSource implements SampleSource, Loader.Callback {
     if (enabledTrackCount > 0) {
       maybeStartLoading();
     } else {
+      //AMZN_CHANGE_BEGIN
+      if(!prepared && isCurrentLoadableTsChunk) {
+        Log.i("HlsSampleSource", "not clearing state or hinting allocator " +
+                "trim as this chunk is TS. Prepared= " + prepared);
+        return;
+      } //AMZN_CHANGE_END
       clearState();
       allocator.trim(0);
     }
