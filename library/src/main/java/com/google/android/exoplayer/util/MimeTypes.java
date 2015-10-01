@@ -46,9 +46,12 @@ public final class MimeTypes {
   public static final String AUDIO_RAW = BASE_TYPE_AUDIO + "/raw";
   public static final String AUDIO_AC3 = BASE_TYPE_AUDIO + "/ac3";
   public static final String AUDIO_E_AC3 = BASE_TYPE_AUDIO + "/eac3";
+  // Fire TV Stick Gen1 Dolby decoder outputs mime type as audio/ec3 !!!
+  public static final String AUDIO_CUSTOM_EC3 = BASE_TYPE_AUDIO + "/ec3"; //AMZN_CHANGE_ONELINE
   public static final String AUDIO_TRUEHD = BASE_TYPE_AUDIO + "/true-hd";
   public static final String AUDIO_DTS = BASE_TYPE_AUDIO + "/vnd.dts";
   public static final String AUDIO_DTS_HD = BASE_TYPE_AUDIO + "/vnd.dts.hd";
+
   public static final String AUDIO_VORBIS = BASE_TYPE_AUDIO + "/vorbis";
   public static final String AUDIO_OPUS = BASE_TYPE_AUDIO + "/opus";
   public static final String AUDIO_AMR_NB = BASE_TYPE_AUDIO + "/3gpp";
@@ -180,4 +183,18 @@ public final class MimeTypes {
     return MimeTypes.AUDIO_UNKNOWN;
   }
 
+  //AMZN_CHANGE_BEGIN
+  /**
+   * Returns whether the specified {@code mimeType} represents audio that can be played via
+   * passthrough if the device supports it.
+   *
+   * @param mimeType The MIME type of media.
+   * @return Whether the audio can be played via passthrough
+   */
+  public static boolean isPassthroughAudio(String mimeType) {
+    return (mimeType != null) && ( AUDIO_AC3.equals(mimeType) ||
+            AUDIO_E_AC3.equals(mimeType) || AUDIO_CUSTOM_EC3.equals(mimeType));
+  }
+  //AMZN_CHANGE_END
+  
 }
