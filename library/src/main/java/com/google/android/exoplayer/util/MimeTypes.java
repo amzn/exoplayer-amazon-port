@@ -47,6 +47,8 @@ public final class MimeTypes {
   public static final String AUDIO_RAW = BASE_TYPE_AUDIO + "/raw";
   public static final String AUDIO_AC3 = BASE_TYPE_AUDIO + "/ac3";
   public static final String AUDIO_E_AC3 = BASE_TYPE_AUDIO + "/eac3";
+  // Fire TV Stick Gen1 Dolby decoder outputs mime type as audio/ec3 !!!
+  public static final String AUDIO_CUSTOM_EC3 = BASE_TYPE_AUDIO + "/ec3"; //AMZN_CHANGE_ONELINE
   public static final String AUDIO_TRUEHD = BASE_TYPE_AUDIO + "/true-hd";
   public static final String AUDIO_DTS = BASE_TYPE_AUDIO + "/vnd.dts";
   public static final String AUDIO_DTS_HD = BASE_TYPE_AUDIO + "/vnd.dts.hd";
