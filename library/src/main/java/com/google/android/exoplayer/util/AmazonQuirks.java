@@ -64,6 +64,11 @@ import android.util.Log;
          return AUDIO_HARDWARE_LATENCY_FOR_TABLETS;
      }
 
+     public static boolean isDolbyPassthroughQuirkEnabled() {
+         // Sets dolby passthrough quirk for Amazon Fire TV (Gen 1) Family
+         return isFireTVGen1Family();
+     }
+
      public static boolean isAmazonDevice(){
          return isAmazonDevice;
      }
@@ -86,5 +91,20 @@ import android.util.Log;
              Log.e(TAG,"Exception in finding build version",e);
          }
          return Long.MAX_VALUE;
+     }
+
+     // We assume that this function is called only for supported
+     // passthrough mimetypes such as AC3, EAC3 etc
+     public static boolean useDefaultPassthroughDecoder() {
+         //Use platform decoder for
+         //FireTV Gen1
+         //FireTV Stick
+         if (isFireTVGen1Family()) {
+             Log.i(TAG,"using platform Dolby decoder");
+             return false;
+         }
+
+         Log.i(TAG,"using default Dolby pass-through decoder");
+         return true;
      }
  }
