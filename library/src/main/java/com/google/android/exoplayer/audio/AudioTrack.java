@@ -768,7 +768,7 @@ public final class AudioTrack {
       } else {
       audioTrackUtil.handleEndOfStream(getSubmittedFrames());
       }
-      //AMZN_CHANGE_END
+      // AMZN_CHANGE_END
     }
   }
 
@@ -878,6 +878,11 @@ public final class AudioTrack {
             toRelease.flush();
             toRelease.release();
           } finally {
+            // AMZN_CHANGE_BEGIN
+            if (passthrough && AmazonQuirks.waitAfterReleaseAudioTrackQuirk()) {
+              Log.i(TAG, "introduced delay after track release");
+            }
+            // AMZN_CHANGE_END
             releasingConditionVariable.open();
           }
         }
