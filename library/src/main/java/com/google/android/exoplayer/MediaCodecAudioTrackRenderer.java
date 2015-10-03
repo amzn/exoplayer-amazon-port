@@ -337,10 +337,14 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer implem
       throws ExoPlaybackException {
     log.d("processOutputBuffer: positionUs = " + positionUs +
             " elapsedRealtimeUs =  " + elapsedRealtimeUs +
+            " bufferInfo.flags = " + bufferInfo.flags +
             " bufferIndex = " + bufferIndex +
             " shouldSkip = " + shouldSkip +
             " presentationTimeUs = " + bufferInfo.presentationTimeUs);
-    if (shouldSkip) {
+    //We also skip rendering output frames that contain codec config only.
+    if (shouldSkip ||
+            ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == //AMZN_CHANGE_ONELINE
+               MediaCodec.BUFFER_FLAG_CODEC_CONFIG)) { //AMZN_CHANGE_ONELINE
       log.w("Skipping Audio sample!!!");
       codec.releaseOutputBuffer(bufferIndex, false);
       codecCounters.skippedOutputBufferCount++;
