@@ -31,6 +31,7 @@ import android.util.Log;
   private static final String DEVICEMODEL = Build.MODEL;
   private static final String MANUFACTURER = Build.MANUFACTURER;
   private static final int AUDIO_HARDWARE_LATENCY_FOR_TABLETS = 90000;
+  private static final int WAIT_AFTER_RELEASE_AUDIO_TRACK_TIME_MS = 1000;
 
   public static boolean isAdaptive(String mimeType) {
     if (mimeType == null || mimeType.isEmpty()) {
@@ -87,4 +88,11 @@ import android.util.Log;
     Log.i(TAG,"using platform Dolby decoder");
     return false;
   }
- }
+  public static boolean waitAfterReleaseAudioTrackQuirk() {
+    if (isFireTVGen2()) {
+       android.os.SystemClock.sleep(WAIT_AFTER_RELEASE_AUDIO_TRACK_TIME_MS);
+       return true;
+    }
+    return false;
+  }
+}
