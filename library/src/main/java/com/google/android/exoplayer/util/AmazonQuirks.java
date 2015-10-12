@@ -16,6 +16,7 @@
 package com.google.android.exoplayer.util;
 
 import java.lang.String;
+import java.lang.Long;
 
 import android.os.Build;
 
@@ -33,6 +34,7 @@ import android.util.Log;
   private static final int AUDIO_HARDWARE_LATENCY_FOR_TABLETS = 90000;
   private static final int WAIT_AFTER_RELEASE_AUDIO_TRACK_TIME_MS = 1000;
   private static final int MAX_INPUT_AVC_SIZE_FIRETV_GEN2 = (int) (2.8 * 1024 * 1024);
+  private static final long FIRETV_GEN2_FOS5_DOLBY_FIX_OS_BUILD_NUM = 537170700;
 
   public static boolean isAdaptive(String mimeType) {
     if (mimeType == null || mimeType.isEmpty()) {
@@ -90,11 +92,31 @@ import android.util.Log;
              DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN2_DEVICE_MODEL) );
   }
 
+  private static long getBuildVersion() {
+    try {
+      String[] verSplit = Build.VERSION.INCREMENTAL.split("_");
+      if (verSplit.length > 2) {
+          return Long.valueOf(verSplit[2]);
+      }
+    } catch (Exception e) {
+      Log.e(TAG,"Exception in finding build version",e);
+    }
+    return Long.MAX_VALUE;
+  }
+
+  // We assume that this function is called only for supported
+  // passthrough mimetypes such as AC3, EAC3 etc
   public static boolean useDefaultPassthroughDecoder() {
-    if (!isAmazonDevice() || isFireTVGen2() ) {
-      Log.i(TAG,"using default Dolby pass-through decoder");
+    if (!isAmazonDevice() || (isFireTVGen2() &&
+                                getBuildVersion() >= FIRETV_GEN2_FOS5_DOLBY_FIX_OS_BUILD_NUM) ) {
+      Log.i(TAG,"using default pass-through decoder");
       return true;
     }
+    //Use platform decoder for
+    //FireTV Gen1
+    //FireTV Stick
+    //FireTV Gen2 OS Build version without Dolby Fixes &
+    //Fire Tablets
     Log.i(TAG,"using platform Dolby decoder");
     return false;
   }
