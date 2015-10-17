@@ -73,6 +73,10 @@ import android.util.Log;
          return isAmazonDevice;
      }
 
+     public static boolean shouldExtractPlayReadyHeader() {
+         return isFireTVGen1Family() || isFireTVGen2();
+     }
+
      public static boolean isFireTVGen1Family() {
          return isFireTVGen1 || isFireTVStick;
      }
