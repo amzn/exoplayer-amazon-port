@@ -18,6 +18,7 @@ package com.google.android.exoplayer;
 import com.google.android.exoplayer.MediaCodecUtil.DecoderQueryException;
 import com.google.android.exoplayer.drm.DrmInitData;
 import com.google.android.exoplayer.drm.DrmSessionManager;
+import com.google.android.exoplayer.util.AmazonQuirks;
 import com.google.android.exoplayer.util.Assertions;
 import com.google.android.exoplayer.util.TraceUtil;
 import com.google.android.exoplayer.util.Util;
@@ -979,7 +980,8 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
    *     propagation incorrectly on the host device. False otherwise.
    */
   private static boolean codecNeedsEosPropagationWorkaround(String name) {
-    return Util.SDK_INT <= 17 && "OMX.rk.video_decoder.avc".equals(name);
+    return AmazonQuirks.codecNeedsEosPropagationWorkaround(name) ||
+             ( Util.SDK_INT <= 17 && "OMX.rk.video_decoder.avc".equals(name) ); // AMZN_CHANGE_ONELINE
   }
 
   /**
