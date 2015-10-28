@@ -29,6 +29,7 @@ import android.util.Log;
      private static final String DEVICEMODEL = Build.MODEL;
      private static final String MANUFACTURER = Build.MANUFACTURER;
      private static final int AUDIO_HARDWARE_LATENCY_FOR_TABLETS = 90000;
+     private static final long FIRETV_GEN2_FOS5_PR_CLEAR_FIX_OS_BUILD_NUM = 550078110;
      //caching
      private static final boolean isAmazonDevice;
      private static final boolean isFireTVGen1;
@@ -116,5 +117,16 @@ import android.util.Log;
 
          Log.i(TAG,"using default Dolby pass-through decoder");
          return true;
+     }
+
+     public static boolean codecNeedsEosPropagationWorkaround(String name) {
+         return (isFireTVGen2() && fireTVFireOsBuildVersion <= FIRETV_GEN2_FOS5_PR_CLEAR_FIX_OS_BUILD_NUM);
+     }
+
+     public static boolean shouldSkipCSDInConfigure(String mimeType) {
+         return isFireTVGen2()
+                 && fireTVFireOsBuildVersion <= FIRETV_GEN2_FOS5_PR_CLEAR_FIX_OS_BUILD_NUM
+                 && MimeTypes.isVideo(mimeType);
+
      }
  }
