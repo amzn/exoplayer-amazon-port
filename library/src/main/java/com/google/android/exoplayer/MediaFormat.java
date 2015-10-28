@@ -17,7 +17,11 @@ package com.google.android.exoplayer;
 
 import com.google.android.exoplayer.util.Assertions;
 import com.google.android.exoplayer.util.Util;
-
+// AMZN_CHANGE_BEGIN
+import com.google.android.exoplayer.util.MimeTypes;
+import com.google.android.exoplayer.util.AmazonQuirks;
+import com.google.android.exoplayer.util.Logger;
+//AMZN_CHANGE_END
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 
@@ -30,7 +34,10 @@ import java.util.List;
  * Defines the format of an elementary media stream.
  */
 public final class MediaFormat {
-
+  //AMZN_CHANGE_BEGIN
+  private final static String TAG = MediaFormat.class.getSimpleName();
+  private static final Logger log = new Logger(Logger.Module.AudioVideoCommon, TAG);
+  //AMZN_CHANGE_END
   public static final int NO_VALUE = -1;
 
   /**
@@ -253,9 +260,15 @@ public final class MediaFormat {
       maybeSetIntegerV16(format, android.media.MediaFormat.KEY_MAX_HEIGHT, maxHeight);
       maybeSetIntegerV16(format, android.media.MediaFormat.KEY_CHANNEL_COUNT, channelCount);
       maybeSetIntegerV16(format, android.media.MediaFormat.KEY_SAMPLE_RATE, sampleRate);
-      for (int i = 0; i < initializationData.size(); i++) {
-        format.setByteBuffer("csd-" + i, ByteBuffer.wrap(initializationData.get(i)));
+      // AMZN_CHANGE_BEGIN
+      if ( !(AmazonQuirks.isFireTVGen2() && MimeTypes.isVideo(mimeType)) ){
+        for (int i = 0; i < initializationData.size(); i++) {
+          format.setByteBuffer("csd-" + i, ByteBuffer.wrap(initializationData.get(i)));
+        }
+      } else {
+        log.i("Not sending Video CSD in configure for Amazon Fire TV Gen2!!!");
       }
+      // AMZN_CHANGE_END
       if (durationUs != C.UNKNOWN_TIME_US) {
         format.setLong(android.media.MediaFormat.KEY_DURATION, durationUs);
       }
