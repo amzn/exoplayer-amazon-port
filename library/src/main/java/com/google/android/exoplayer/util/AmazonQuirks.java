@@ -80,15 +80,16 @@ import android.util.Log;
      public static boolean isFireTVGen1Family() {
          return isFireTVGen1 || isFireTVStick;
      }
-  public static boolean isDecoderBlacklisted(String codecName) {
-     if(!isAmazonDevice()) {
+
+     public static boolean isDecoderBlacklisted(String codecName) {
+         if (!isAmazonDevice()) {
+             return false;
+         }
+         if (isFireTVGen2() && codecName.startsWith("OMX.MTK.AUDIO.DECODER.MP3")) {
+             return true;
+         }
          return false;
      }
-     if(isFireTVGen2() && codecName.startsWith("OMX.MTK.AUDIO.DECODER.MP3")) {
-         return true;
-     }
-     return false;
-  }
 
      public static boolean isFireTVGen2() {
          return isFireTVGen2;
@@ -119,5 +120,15 @@ import android.util.Log;
 
          Log.i(TAG,"using default Dolby pass-through decoder");
          return true;
+     }
+     /* In Fire TV Gen1 family of devices, there is a platform limitation that
+     * codec cannot be initialized with a crypto object before the DRM keys are
+     * provided to MediaDRM - the media codec either skips processing or
+     * throws error on processing the CSD provided in clear as part of the
+     * media format object passed in configure API.
+     * Hence, we wait for the DRM keys to be acquired before initializing the codec.
+     */
+     public static boolean waitForDRMKeysBeforeInitCodec() {
+         return isFireTVGen1Family();
      }
  }
