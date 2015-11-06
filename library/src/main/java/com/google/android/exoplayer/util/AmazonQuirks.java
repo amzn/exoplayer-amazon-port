@@ -19,8 +19,6 @@ import java.lang.String;
 
 import android.os.Build;
 
-import com.google.android.exoplayer.util.Util;
-import com.google.android.exoplayer.util.MimeTypes;
 import android.util.Log;
  public class AmazonQuirks {
   private static final String TAG = AmazonQuirks.class.getSimpleName();
@@ -115,6 +113,7 @@ import android.util.Log;
   }
 
 
+
   public static boolean codecNeedsEosPropagationWorkaround(String name) {
     return (isFireTVGen2() && fireTVFireOsBuildVersion <= FIRETV_GEN2_FOS5_PR_CLEAR_FIX_OS_BUILD_NUM);
   }
@@ -124,5 +123,16 @@ import android.util.Log;
          && fireTVFireOsBuildVersion <= FIRETV_GEN2_FOS5_PR_CLEAR_FIX_OS_BUILD_NUM
          && MimeTypes.isVideo(mimeType);
 
+  }
+
+  /* In Fire TV Gen1 family of devices, there is a platform limitation that
+   * codec cannot be initialized with a crypto object before the DRM keys are
+   * provided to MediaDRM - the media codec either skips processing or
+   * throws error on processing the CSD provided in clear as part of the
+   * media format object passed in configure API.
+   * Hence, we wait for the DRM keys to be acquired before initializing the codec.
+   */
+  public static boolean waitForDRMKeysBeforeInitCodec() {
+    return isFireTVGen1Family();
   }
 }
