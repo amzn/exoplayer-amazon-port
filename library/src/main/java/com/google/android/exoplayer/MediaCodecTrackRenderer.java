@@ -21,6 +21,7 @@ import com.google.android.exoplayer.drm.DrmSessionManager;
 import com.google.android.exoplayer.util.Assertions;
 import com.google.android.exoplayer.util.TraceUtil;
 import com.google.android.exoplayer.util.Util;
+import com.google.android.exoplayer.util.AmazonQuirks; // AMZN_CHANGE_ONELINE
 
 import android.annotation.TargetApi;
 import android.media.MediaCodec;
@@ -313,13 +314,23 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
       int drmSessionState = drmSessionManager.getState();
       if (drmSessionState == DrmSessionManager.STATE_ERROR) {
         throw new ExoPlaybackException(drmSessionManager.getError());
-      } else if (drmSessionState == DrmSessionManager.STATE_OPENED
-          || drmSessionState == DrmSessionManager.STATE_OPENED_WITH_KEYS) {
-        mediaCrypto = drmSessionManager.getMediaCrypto();
-        requiresSecureDecoder = drmSessionManager.requiresSecureDecoderComponent(mimeType);
       } else {
-        // The drm session isn't open yet.
-        return;
+        //AMZN_CHANGE_BEGIN
+        boolean canInitCodec = false;
+        if (AmazonQuirks.waitForDRMKeysBeforeInitCodec()) {
+          canInitCodec = (drmSessionState == DrmSessionManager.STATE_OPENED_WITH_KEYS);
+        } else {
+          canInitCodec = (drmSessionState == DrmSessionManager.STATE_OPENED ||
+                            drmSessionState == DrmSessionManager.STATE_OPENED_WITH_KEYS);
+        }
+        if (canInitCodec) {
+          mediaCrypto = drmSessionManager.getMediaCrypto();
+          requiresSecureDecoder = drmSessionManager.requiresSecureDecoderComponent(mimeType);
+        } else {
+          // The drm session isn't open yet or drm keys not available yet.
+          return;
+        }
+        //AMZN_CHANGE_END
       }
     }
 
