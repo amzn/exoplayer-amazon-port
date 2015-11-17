@@ -1026,11 +1026,26 @@ public final class AudioTrack {
    * around an issue on platform API versions 21/22 where AC-3 audio tracks can't be paused, so we
    * empty their buffers when paused. In this case, they should still behave as if they have
    * pending data, otherwise writing will never resume.
+   *
+   * Additionally, in FireOS 4 based Amazon Tablets, after playback is resumed,
+   * the play head position returned by AudioTrack during its stabilization phase
+   * jumps to a high value, causing us to falsely believe that there is an under-run.
+   * This workaround makes us behave as though AudioTrack has pending data irrespective of
+   * the playback head position reported by AudioTrack til 1 sec after playback has resumed.
    */
   private boolean overrideHasPendingData() {
-    return needsPassthroughWorkarounds()
-        && audioTrack.getPlayState() == android.media.AudioTrack.PLAYSTATE_PAUSED
-        && audioTrack.getPlaybackHeadPosition() == 0;
+    //AMZN_CHANGE_BEGIN
+    boolean hasPendingPassthroughData = needsPassthroughWorkarounds()
+        && ( audioTrack.getPlayState() == android.media.AudioTrack.PLAYSTATE_PAUSED )
+        && ( audioTrack.getPlaybackHeadPosition() == 0 );
+    if (hasPendingPassthroughData) {
+      return true;
+    }
+    boolean hasPendingDataQuirk = AmazonQuirks.isLatencyQuirkEnabled()
+        && ( audioTrack.getPlayState() == android.media.AudioTrack.PLAYSTATE_PLAYING )
+        && ( ((System.nanoTime() / 1000) - resumeSystemTimeUs) < C.MICROS_PER_SECOND );
+    return hasPendingDataQuirk;
+    //AMZN_CHANGE_END
   }
 
   private int getEncodingForMimeType(String mimeType) {
