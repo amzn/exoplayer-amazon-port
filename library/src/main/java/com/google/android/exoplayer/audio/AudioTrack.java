@@ -1062,12 +1062,26 @@ public final class AudioTrack {
      * empty their buffers when paused. In this case, they should still behave as if they have
      * pending data, otherwise writing will never resume.
      *
+     * Additionally, in FireOS 4 based Amazon Tablets, after playback is resumed,
+     * the play head position returned by AudioTrack during its stabilization phase
+     * jumps to a high value, causing us to falsely believe that there is an under-run.
+     * This workaround makes us behave as though AudioTrack has pending data irrespective of
+     * the playback head position reported by AudioTrack til 1 sec after playback has resumed.
      * @see #handleBuffer
      */
     public boolean overrideHasPendingData() {
-      return Util.SDK_INT <= 22 && isPassthrough
-          && audioTrack.getPlayState() == android.media.AudioTrack.PLAYSTATE_PAUSED
-          && audioTrack.getPlaybackHeadPosition() == 0;
+      //AMZN_CHANGE_BEGIN
+      boolean hasPendingPassthroughData = Util.SDK_INT <= 22 && isPassthrough
+          && ( audioTrack.getPlayState() == android.media.AudioTrack.PLAYSTATE_PAUSED )
+          && ( audioTrack.getPlaybackHeadPosition() == 0 );
+      if (hasPendingPassthroughData) {
+        return true;
+      }
+      boolean hasPendingDataQuirk = AmazonQuirks.isLatencyQuirkEnabled()
+          && ( audioTrack.getPlayState() == android.media.AudioTrack.PLAYSTATE_PLAYING )
+          && ( SystemClock.uptimeMillis() - resumeTime < C.MILLIS_PER_SECOND );
+      return hasPendingDataQuirk;
+      //AMZN_CHANGE_END
     }
 
     /**
