@@ -29,6 +29,7 @@ import android.util.Log;
      private static final String DEVICEMODEL = Build.MODEL;
      private static final String MANUFACTURER = Build.MANUFACTURER;
      private static final int AUDIO_HARDWARE_LATENCY_FOR_TABLETS = 90000;
+     private static final int MAX_INPUT_AVC_SIZE_FIRETV_GEN2 = (int) (2.8 * 1024 * 1024);
      //caching
      private static final boolean isAmazonDevice;
      private static final boolean isFireTVGen1;
@@ -135,5 +136,14 @@ import android.util.Log;
              Log.i(TAG, "Codec Needs EOS Propagation Workaround " + codecName);
          }
          return needsWorkaround;
+     }
+     /* Fire TV Gen2 device has a limitation of max input size
+     *  for AVC frames - capped at 2.8 MB.
+     */
+     public static boolean isMaxInputAVCSizeSupported(int maxInputSize) {
+         if (isFireTVGen2()) {
+             return maxInputSize <= MAX_INPUT_AVC_SIZE_FIRETV_GEN2;
+         }
+         return true;
      }
  }
