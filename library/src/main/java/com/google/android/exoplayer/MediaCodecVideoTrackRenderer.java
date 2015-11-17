@@ -30,6 +30,7 @@ import com.google.android.exoplayer.drm.FrameworkMediaCrypto;
 import com.google.android.exoplayer.util.MimeTypes;
 import com.google.android.exoplayer.util.TraceUtil;
 import com.google.android.exoplayer.util.Util;
+import com.google.android.exoplayer.util.AmazonQuirks; // AMZN_CHANGE_ONELINE
 import java.nio.ByteBuffer;
 
 /**
@@ -512,6 +513,7 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
     }
     int maxPixels;
     int minCompressionRatio;
+    boolean isH264 = false; //AMZN_CHANGE_ONELINE
     switch (format.getString(android.media.MediaFormat.KEY_MIME)) {
       case MimeTypes.VIDEO_H263:
       case MimeTypes.VIDEO_MP4V:
@@ -527,6 +529,7 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
         // Round up width/height to an integer number of macroblocks.
         maxPixels = ((maxWidth + 15) / 16) * ((maxHeight + 15) / 16) * 16 * 16;
         minCompressionRatio = 2;
+        isH264 = true; //AMZN_CHANGE_ONELINE
         break;
       case MimeTypes.VIDEO_VP8:
         // VPX does not specify a ratio so use the values from the platform's SoftVPX.cpp.
@@ -544,6 +547,14 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
     }
     // Estimate the maximum input size assuming three channel 4:2:0 subsampled input frames.
     int maxInputSize = (maxPixels * 3) / (2 * minCompressionRatio);
+
+    // AMZN_CHANGE_BEGIN
+    if (isH264 && !AmazonQuirks.isMaxInputAVCSizeSupported(maxInputSize)) {
+      //log.i("Ignoring Unsupported max input AVC  size : " + maxInputSize);
+      return;
+    }
+    // AMZN_CHANGE_END
+
     format.setInteger(android.media.MediaFormat.KEY_MAX_INPUT_SIZE, maxInputSize);
   }
 
