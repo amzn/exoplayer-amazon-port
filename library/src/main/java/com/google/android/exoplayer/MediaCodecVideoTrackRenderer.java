@@ -20,6 +20,7 @@ import com.google.android.exoplayer.drm.DrmSessionManager;
 import com.google.android.exoplayer.util.MimeTypes;
 import com.google.android.exoplayer.util.TraceUtil;
 import com.google.android.exoplayer.util.Util;
+import com.google.android.exoplayer.util.AmazonQuirks; // AMZN_CHANGE_ONELINE
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
@@ -518,6 +519,14 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
     }
     // H264 requires compression ratio of at least 2, and uses macroblocks.
     int maxInputSize = ((maxWidth + 15) / 16) * ((maxHeight + 15) / 16) * 192;
+
+    // AMZN_CHANGE_BEGIN
+    if (!AmazonQuirks.isMaxInputAVCSizeSupported(maxInputSize)) {
+      //log.i("Ignoring Unsupported max input AVC  size : " + maxInputSize);
+      return;
+    }
+    // AMZN_CHANGE_END
+
     format.setInteger(android.media.MediaFormat.KEY_MAX_INPUT_SIZE, maxInputSize);
   }
 
