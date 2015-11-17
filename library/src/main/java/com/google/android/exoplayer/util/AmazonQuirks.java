@@ -32,6 +32,7 @@ import android.util.Log;
   private static final String MANUFACTURER = Build.MANUFACTURER;
   private static final int AUDIO_HARDWARE_LATENCY_FOR_TABLETS = 90000;
   private static final int WAIT_AFTER_RELEASE_AUDIO_TRACK_TIME_MS = 1000;
+  private static final int MAX_INPUT_AVC_SIZE_FIRETV_GEN2 = (int) (2.8 * 1024 * 1024);
 
   public static boolean isAdaptive(String mimeType) {
     if (mimeType == null || mimeType.isEmpty()) {
@@ -106,6 +107,7 @@ import android.util.Log;
     return false;
   }
 
+
   /* In Fire TV Gen1 family of devices, there is a platform limitation that
    * codec cannot be initialized with a crypto object before the DRM keys are
    * provided to MediaDRM - the media codec either skips processing or
@@ -115,5 +117,16 @@ import android.util.Log;
    */
   public static boolean waitForDRMKeysBeforeInitCodec() {
     return isFireTVGen1Family();
+  }
+
+  /* Fire TV Gen2 device has a limitation of max input size
+   * for AVC frames - capped at 2.8 MB.
+   */
+  public static boolean isMaxInputAVCSizeSupported(int maxInputSize) {
+    if (isFireTVGen2()) {
+      return maxInputSize <= MAX_INPUT_AVC_SIZE_FIRETV_GEN2;
+    }
+    return true;
+
   }
 }
