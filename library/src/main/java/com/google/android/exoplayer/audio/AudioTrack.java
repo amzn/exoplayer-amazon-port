@@ -1054,16 +1054,22 @@ public final class AudioTrack {
     switch (mimeType) {
       case MimeTypes.AUDIO_AC3:
         encoding = C.ENCODING_AC3;
+        break;
       case MimeTypes.AUDIO_EC3:
         encoding = C.ENCODING_E_AC3;
+        break;
       case MimeTypes.AUDIO_DTS:
         encoding = C.ENCODING_DTS;
+        break;
       case MimeTypes.AUDIO_DTS_HD:
         encoding = C.ENCODING_DTS_HD;
+        break;
       case MimeTypes.AUDIO_CUSTOM_EC3:
         encoding = C.ENCODING_E_AC3;
+        break;
       default:
         encoding = AudioFormat.ENCODING_INVALID;
+        break;
     }
 
     // If this method is found in AudioTrack,this device is Fire TV family
