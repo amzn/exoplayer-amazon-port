@@ -188,6 +188,7 @@ public final class AudioTrack {
   private int minBufferSize;
   private int bufferSize;
   private boolean isPassthrough;//AMZN_CHANGE_ONELINE
+  private final boolean isFireTVGen2;//AMZN_CHANGE_ONELINE
   private int nextPlayheadOffsetIndex;
   private int playheadOffsetCount;
   private long smoothedPlayheadOffsetUs;
@@ -243,6 +244,7 @@ public final class AudioTrack {
     log.i("isLatencyQuirkEnabled = " + isLatencyQuirkEnabled);
     isDolbyPassthroughQuirkEnabled = AmazonQuirks.isDolbyPassthroughQuirkEnabled();
     log.i("isDolbyPassthroughQuirkEnabled = " + isDolbyPassthroughQuirkEnabled);
+    isFireTVGen2 = AmazonQuirks.isFireTVGen2();
     isPassthrough = false;
     // AMZN_CHANGE_END
     releasingConditionVariable = new ConditionVariable(true);
@@ -326,7 +328,7 @@ public final class AudioTrack {
     // for dolby passthrough case, we don't need to sync sample
     // params because we don't depend on play head position for timestamp
     if (audioTrack.getPlayState() == android.media.AudioTrack.PLAYSTATE_PLAYING
-        && !applyDolbyPassthroughQuirk() ) { // AMZN_CHANGE_ONELINE
+        && (isFireTVGen2 || !applyDolbyPassthroughQuirk())) { // AMZN_CHANGE_ONELINE
       maybeSampleSyncParams();
     }
 
@@ -335,7 +337,7 @@ public final class AudioTrack {
     // AMZN_CHANGE_BEGIN
     // for dolby passthrough case ,we just depend on getTimeStamp API
     // for audio video synchronization.
-    if (applyDolbyPassthroughQuirk()) {
+    if (!isFireTVGen2 && applyDolbyPassthroughQuirk()) {
       long audioTimeStamp = 0;
       audioTimestampSet = audioTrackUtil.updateTimestamp();
       if (audioTimestampSet) {
