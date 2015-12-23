@@ -396,14 +396,18 @@ public class MediaCodecAudioTrackRenderer extends MediaCodecTrackRenderer implem
       }
     } else {
       // Check for AudioTrack underrun.
-      boolean audioTrackHadData = audioTrackHasData;
-      audioTrackHasData = audioTrack.hasPendingData();
-      if (audioTrackHadData && !audioTrackHasData && getState() == TrackRenderer.STATE_STARTED) {
-        long elapsedSinceLastFeedMs = SystemClock.elapsedRealtime() - lastFeedElapsedRealtimeMs;
-        long bufferSizeUs = audioTrack.getBufferSizeUs();
-        long bufferSizeMs = bufferSizeUs == C.UNKNOWN_TIME_US ? -1 : bufferSizeUs / 1000;
-        notifyAudioTrackUnderrun(audioTrack.getBufferSize(), bufferSizeMs, elapsedSinceLastFeedMs);
+      // AMZN_CHANGE_BEGIN
+      if (!AmazonQuirks.isFireTVGen2()) {
+        boolean audioTrackHadData = audioTrackHasData;
+        audioTrackHasData = audioTrack.hasPendingData();
+        if (audioTrackHadData && !audioTrackHasData && getState() == TrackRenderer.STATE_STARTED) {
+          long elapsedSinceLastFeedMs = SystemClock.elapsedRealtime() - lastFeedElapsedRealtimeMs;
+          long bufferSizeUs = audioTrack.getBufferSizeUs();
+          long bufferSizeMs = bufferSizeUs == C.UNKNOWN_TIME_US ? -1 : bufferSizeUs / 1000;
+          notifyAudioTrackUnderrun(audioTrack.getBufferSize(), bufferSizeMs, elapsedSinceLastFeedMs);
+        }
       }
+      // AMZN_CHANGE_END
     }
 
     int handleBufferResult;
