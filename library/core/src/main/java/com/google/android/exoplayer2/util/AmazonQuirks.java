@@ -122,4 +122,46 @@ public final class AmazonQuirks {
         }
         return needsWorkaround;
     }
+    /**
+      * Updates log level based on a local system property of the device. This can be very useful
+      * to enable logging in scenarios when a 3P developer has issues we need to assist
+      * Example:
+      * adb shell setprop com.amazon.exoplayer.forcelog Video:verbose#Audio:debug
+      */
+     private static void loadForcedLogSettings() {
+         String setting = getSystemProperty("com.amazon.exoplayer.forcelog");
+         // this happens on release builds, and without disabling setenforce
+         if (setting == null || setting.equals("")) {
+             return;
+         }
+         try {
+             String[] pairs = setting.split("#");
+             for (String onePair: pairs) {
+                 String[] elements = onePair.split(":");
+                 Logger.Module module = Logger.Module.valueOf(elements[0]);
+                 int level = 0;
+                 String levelStr = elements[1];
+                 switch (levelStr.toLowerCase()) {
+                     case "error"  : level = Log.ERROR;   break;
+                     case "info"   : level = Log.INFO;    break;
+                     case "verbose": level = Log.VERBOSE; break;
+                     case "warn"   : level = Log.WARN;    break;
+                     default       : level = Log.DEBUG;   break;
+                 }
+                 Logger.setLogLevel(module, level);
+             }
+         } catch (Exception ex) {
+             Log.e(TAG, "Could not set logging level.", ex);
+         }
+     }
+
+     // for debugging purposes only, so it is a minimalistic solution
+     public static String getSystemProperty(String key) {
+         try {
+             Class<?> SP = Class.forName("android.os.SystemProperties");
+             return (String) SP.getMethod("get", String.class).invoke(null, key);
+         } catch (Exception e) {
+             return null;
+         }
+     }
 }

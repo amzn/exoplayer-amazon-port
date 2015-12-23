@@ -41,6 +41,7 @@ import com.google.android.exoplayer2.mediacodec.MediaCodecUtil.DecoderQueryExcep
 import com.google.android.exoplayer2.source.MediaPeriod;
 import com.google.android.exoplayer2.util.AmazonQuirks;
 import com.google.android.exoplayer2.util.Assertions;
+import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.NalUnitUtil;
 import com.google.android.exoplayer2.util.TraceUtil;
 import com.google.android.exoplayer2.util.Util;
@@ -48,6 +49,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.android.exoplayer2.util.Logger;
 /**
  * An abstract renderer that uses {@link MediaCodec} to decode samples for rendering.
  */
@@ -211,6 +213,11 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
 
   protected DecoderCounters decoderCounters;
 
+  // AMZN_CHANGE_ONELINE
+  private final Logger log = new Logger(Logger.Module.AudioVideoCommon, TAG);
+  protected String codecName = "CodecNameUnknown";
+  // AMZN_CHANGE_END
+
   /**
    * @param trackType The track type that the renderer handles. One of the {@code C.TRACK_TYPE_*}
    *     constants defined in {@link C}.
@@ -310,6 +317,8 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     drmSession = pendingDrmSession;
     String mimeType = format.sampleMimeType;
     MediaCrypto wrappedMediaCrypto = null;
+
+    log.i("mimeType = " + mimeType);
     boolean drmSessionRequiresSecureDecoder = false;
     if (drmSession != null) {
       FrameworkMediaCrypto mediaCrypto = drmSession.getMediaCrypto();
@@ -325,6 +334,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
               drmSession.getState() != DrmSession.STATE_OPENED_WITH_KEYS) {
         // we expect the DRM session to be opened with keys before initializing
         // decoder on this device
+        log.i("DRM Keys not available yet...deferring codec init");
         return;
       }
       wrappedMediaCrypto = mediaCrypto.getWrappedMediaCrypto();
@@ -332,6 +342,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     }
 
     if (codecInfo == null) {
+      log.i("requiresSecureDecoder = " + drmSessionRequiresSecureDecoder);
       try {
         codecInfo = getDecoderInfo(mediaCodecSelector, format, drmSessionRequiresSecureDecoder);
         if (codecInfo == null && drmSessionRequiresSecureDecoder) {
@@ -361,7 +372,9 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       return;
     }
 
-    String codecName = codecInfo.name;
+
+    codecName = codecInfo.name;// AMZN_CHANGE_ONELINE
+
     codecNeedsDiscardToSpsWorkaround = codecNeedsDiscardToSpsWorkaround(codecName, format);
     codecNeedsFlushWorkaround = codecNeedsFlushWorkaround(codecName);
     codecNeedsAdaptationWorkaround = codecNeedsAdaptationWorkaround(codecName);
@@ -389,6 +402,14 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       throwDecoderInitError(new DecoderInitializationException(format, e,
           drmSessionRequiresSecureDecoder, codecName));
     }
+    log.setTAG(codecName + "-" + TAG);
+    if (MimeTypes.isAudio(mimeType)) {
+        log.setModule(Logger.Module.Audio);
+    } else {
+        log.setModule(Logger.Module.Video);
+    }
+    log.i("Created Decoder " +
+        (codecInfo.adaptive ? " and Codec is Adaptive " : " and Codec is NOT Adaptive"));
     codecHotswapDeadlineMs = getState() == STATE_STARTED
         ? (SystemClock.elapsedRealtime() + MAX_CODEC_HOTSWAP_TIME_MS) : C.TIME_UNSET;
     inputIndex = C.INDEX_UNSET;
@@ -421,6 +442,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
 
   @Override
   protected void onPositionReset(long positionUs, boolean joining) throws ExoPlaybackException {
+    log.i("onPositionReset: "+ positionUs + ", joining: " + joining);
     inputStreamEnded = false;
     outputStreamEnded = false;
     if (codec != null) {
@@ -452,6 +474,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
   }
 
   protected void releaseCodec() {
+    log.i("releaseCodec");
     codecHotswapDeadlineMs = C.TIME_UNSET;
     inputIndex = C.INDEX_UNSET;
     outputIndex = C.INDEX_UNSET;
@@ -475,6 +498,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     codecReconfigurationState = RECONFIGURATION_STATE_NONE;
     codecReinitializationState = REINITIALIZATION_STATE_NONE;
     buffer.data = null;
+
     if (codec != null) {
       decoderCounters.decoderReleaseCount++;
       try {
@@ -511,6 +535,11 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     if (outputStreamEnded) {
       renderToEndOfStream();
       return;
+    }
+
+    if (log.allowVerbose()) {
+      log.v("render: positionUs = " + positionUs
+              + " elapsedRealtimeUs = " + elapsedRealtimeUs);
     }
     if (format == null) {
       // We don't have a format yet, so try and read one.
@@ -599,7 +628,13 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     if (inputIndex < 0) {
       inputIndex = codec.dequeueInputBuffer(0);
       if (inputIndex < 0) {
+        if (log.allowVerbose()) {
+          log.v("dequeueInputBuffer returned " + inputIndex + "... returning false");
+        }
         return false;
+      }
+      if (log.allowDebug()) {
+        log.d("dequeueInputBuffer returned " + inputIndex);
       }
       buffer.data = inputBuffers[inputIndex];
       buffer.clear();
@@ -631,12 +666,13 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     int result;
     int adaptiveReconfigurationBytes = 0;
     if (waitingForKeys) {
-      // We've already read an encrypted sample into buffer, and are waiting for keys.
+      log.i("We've already read an encrypted sample into sampleHolder, and are waiting for keys");
       result = C.RESULT_BUFFER_READ;
     } else {
       // For adaptive reconfiguration OMX decoders expect all reconfiguration data to be supplied
       // at the start of the buffer that also contains the first frame in the new format.
       if (codecReconfigurationState == RECONFIGURATION_STATE_WRITE_PENDING) {
+        log.i("Appending reconfiguration data at start of the buffer");
         for (int i = 0; i < format.initializationData.size(); i++) {
           byte[] data = format.initializationData.get(i);
           buffer.data.put(data);
@@ -651,9 +687,11 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       return false;
     }
     if (result == C.RESULT_FORMAT_READ) {
+      log.i("Source returned SampleSource.FORMAT_READ");
       if (codecReconfigurationState == RECONFIGURATION_STATE_QUEUE_PENDING) {
         // We received two formats in a row. Clear the current buffer of any reconfiguration data
         // associated with the first format.
+        log.i("We received two formats in a row.");
         buffer.clear();
         codecReconfigurationState = RECONFIGURATION_STATE_WRITE_PENDING;
       }
@@ -661,8 +699,8 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       return true;
     }
 
-    // We've read a buffer.
     if (buffer.isEndOfStream()) {
+      log.i("Reached end of buffer");
       if (codecReconfigurationState == RECONFIGURATION_STATE_QUEUE_PENDING) {
         // We received a new format immediately before the end of the stream. We need to clear
         // the corresponding reconfiguration data from the current buffer, but re-write it into
@@ -680,6 +718,9 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
           // Do nothing.
         } else {
           codecReceivedEos = true;
+          if (log.allowDebug()) {
+            log.d("queueInputBuffer: inputIndex = " + inputIndex + "flag = BUFFER_FLAG_END_OF_STREAM");
+          }
           codec.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
           inputIndex = C.INDEX_UNSET;
         }
@@ -701,6 +742,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     boolean bufferEncrypted = buffer.isEncrypted();
     waitingForKeys = shouldWaitForKeys(bufferEncrypted);
     if (waitingForKeys) {
+      log.i("Waiting For Keys!!!");
       return false;
     }
     if (codecNeedsDiscardToSpsWorkaround && !bufferEncrypted) {
@@ -722,8 +764,17 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       if (bufferEncrypted) {
         MediaCodec.CryptoInfo cryptoInfo = getFrameworkCryptoInfo(buffer,
             adaptiveReconfigurationBytes);
+        if (log.allowDebug()) {
+          log.d("queueSecureInputBuffer: inputIndex = " + inputIndex +
+                                  " presentationTimeUs = " + presentationTimeUs);
+        }
         codec.queueSecureInputBuffer(inputIndex, 0, cryptoInfo, presentationTimeUs, 0);
       } else {
+        if (log.allowDebug()) {
+          log.d("queueInputBuffer: inputIndex = " + inputIndex +
+                                "bufferSize = " + buffer.data.limit() +
+                                "presentationTimeUs = " + presentationTimeUs);
+        }
         codec.queueInputBuffer(inputIndex, 0, buffer.data.limit(), presentationTimeUs, 0);
       }
       inputIndex = C.INDEX_UNSET;
@@ -785,6 +836,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
    * @throws ExoPlaybackException If an error occurs reinitializing the {@link MediaCodec}.
    */
   protected void onInputFormatChanged(Format newFormat) throws ExoPlaybackException {
+    log.i("onInputFormatChanged: format = " + formatHolder.format);
     Format oldFormat = format;
     format = newFormat;
 
@@ -817,6 +869,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
         codecReinitializationState = REINITIALIZATION_STATE_SIGNAL_END_OF_STREAM;
       } else {
         // There aren't any final output buffers, so perform re-initialization immediately.
+        log.i("releasing and reiniting codec");
         releaseCodec();
         maybeInitCodec();
       }
@@ -907,6 +960,9 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
   @SuppressWarnings("deprecation")
   private boolean drainOutputBuffer(long positionUs, long elapsedRealtimeUs)
       throws ExoPlaybackException {
+    if (log.allowVerbose()) {
+      log.v("drainOutputBuffer: positionUs = " + positionUs + " elapsedRealtimeUs = " + elapsedRealtimeUs);
+    }
     if (outputIndex < 0) {
       if (codecNeedsEosOutputExceptionWorkaround && codecReceivedEos) {
         try {
@@ -948,14 +1004,17 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
           shouldSkipOutputBuffer = shouldSkipOutputBuffer(outputBufferInfo.presentationTimeUs);
         }
       } else if (outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED /* (-2) */) {
+        log.i("INFO_OUTPUT_FORMAT_CHANGED");
         processOutputFormat();
         return true;
       } else if (outputIndex == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED /* (-3) */) {
+        log.i("INFO_OUTPUT_BUFFERS_CHANGED");
         processOutputBuffersChanged();
         return true;
       } else /* MediaCodec.INFO_TRY_AGAIN_LATER (-1) or unknown negative return value */ {
         if (codecNeedsEosPropagationWorkaround && (inputStreamEnded
             || codecReinitializationState == REINITIALIZATION_STATE_WAIT_END_OF_STREAM)) {
+          log.i("dequeueOutputBuffer: processEndOfStream will be called while codecNeedsEosPropagationWorkaround is set." );
           processEndOfStream();
         }
         return false;
