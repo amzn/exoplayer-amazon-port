@@ -20,7 +20,8 @@ import java.lang.String;
 import android.os.Build;
 
 import android.util.Log;
- public class AmazonQuirks {
+public final class AmazonQuirks {
+  //ordering of the static initializations is important.
   private static final String TAG = AmazonQuirks.class.getSimpleName();
   private static final String FIRETV_GEN1_DEVICE_MODEL = "AFTB";
   private static final String FIRETV_STICK_DEVICE_MODEL = "AFTM";
@@ -31,20 +32,23 @@ import android.util.Log;
   private static final int AUDIO_HARDWARE_LATENCY_FOR_TABLETS = 90000;
   private static final long FIRETV_GEN2_FOS5_PR_CLEAR_FIX_OS_BUILD_NUM = 550078110;
   private static final int MAX_INPUT_AVC_SIZE_FIRETV_GEN2 = (int) (2.8 * 1024 * 1024);
+  //caching
+  private static final boolean isAmazonDevice;
+  private static final boolean isFireTVGen1;
+  private static final boolean isFireTVStick;
+  private static final boolean isFireTVGen2;
+  private static final long fireTVFireOsBuildVersion;
 
-  private static final long fireTVFireOsBuildVersion = getBuildVersion();
-
-  private static long getBuildVersion() {
-    try {
-      String[] verSplit = Build.VERSION.INCREMENTAL.split("_");
-      if (verSplit.length > 2) {
-        return Long.valueOf(verSplit[2]);
-      }
-    } catch (Exception e) {
-       Log.e(TAG,"Exception in finding build version",e);
-    }
-    return Long.MAX_VALUE;
+  static {// This static block must be at the end
+    //Init ordering is important within this block
+    isAmazonDevice = MANUFACTURER.equalsIgnoreCase(AMAZON);
+    isFireTVGen1 = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN1_DEVICE_MODEL);
+    isFireTVStick = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_STICK_DEVICE_MODEL);
+    isFireTVGen2 = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN2_DEVICE_MODEL);
+    fireTVFireOsBuildVersion = getBuildVersion();
   }
+
+  private AmazonQuirks(){}
 
 
   public static boolean isAdaptive(String mimeType) {
@@ -76,17 +80,15 @@ import android.util.Log;
   }
 
   public static boolean isAmazonDevice(){
-    return MANUFACTURER.equalsIgnoreCase(AMAZON);
+    return isAmazonDevice;
   }
 
   public static boolean isFireTVFamily() {
-    return ( isFireTVGen1Family() || isFireTVGen2() );
+    return isFireTVGen1Family() || isFireTVGen2();
   }
 
   public static boolean isFireTVGen1Family() {
-    return ( isAmazonDevice() &&
-             ( DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN1_DEVICE_MODEL) ||
-                               DEVICEMODEL.equalsIgnoreCase(FIRETV_STICK_DEVICE_MODEL) ));
+    return isFireTVGen1 || isFireTVStick;
   }
   public static boolean isDecoderBlacklisted(String codecName) {
      if(!isAmazonDevice()) {
@@ -99,15 +101,33 @@ import android.util.Log;
   }
 
   public static boolean isFireTVGen2() {
-    return ( isAmazonDevice() &&
-             DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN2_DEVICE_MODEL) );
+    return isFireTVGen2;
   }
 
+  private static long getBuildVersion() {
+    try {
+      String[] verSplit = Build.VERSION.INCREMENTAL.split("_");
+      if (verSplit.length > 2) {
+          return Long.valueOf(verSplit[2]);
+      }
+    } catch (Exception e) {
+      Log.e(TAG,"Exception in finding build version",e);
+    }
+    return Long.MAX_VALUE;
+  }
+
+  // We assume that this function is called only for supported
+  // passthrough mimetypes such as AC3, EAC3 etc
   public static boolean useDefaultPassthroughDecoder() {
     if (!isAmazonDevice() || isFireTVGen2() ) {
       Log.i(TAG,"using default Dolby pass-through decoder");
       return true;
     }
+    //Use platform decoder for
+    //FireTV Gen1
+    //FireTV Stick
+    //FireTV Gen2 OS Build version without Dolby Fixes &
+    //Fire Tablets
     Log.i(TAG,"using platform Dolby decoder");
     return false;
   }
