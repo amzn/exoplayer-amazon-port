@@ -50,6 +50,7 @@ import com.google.android.exoplayer2.drm.DrmSession.DrmSessionException;
 import com.google.android.exoplayer2.source.SampleStream.ReadDataResult;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Log;
+import com.google.android.exoplayer2.util.Logger; // AMZN_CHANGE_ONELINE
 import com.google.android.exoplayer2.util.MediaClock;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.TraceUtil;
@@ -89,6 +90,7 @@ public abstract class DecoderAudioRenderer<
     extends BaseRenderer implements MediaClock {
 
   private static final String TAG = "DecoderAudioRenderer";
+  private final Logger log = new Logger(Logger.Module.Audio, TAG); // AMZN_CHANGE_ONELINE
 
   @Documented
   @Retention(RetentionPolicy.SOURCE)
@@ -305,7 +307,7 @@ public abstract class DecoderAudioRenderer<
         TraceUtil.endSection();
       } catch (DecoderException e) {
         // Can happen with dequeueOutputBuffer, dequeueInputBuffer, queueInputBuffer
-        Log.e(TAG, "Audio codec error", e);
+        log.e("Audio codec error", e); // AMZN_CHANGE_ONELINE
         eventDispatcher.audioCodecError(e);
         throw createRendererException(e, inputFormat, PlaybackException.ERROR_CODE_DECODING_FAILED);
       } catch (AudioSink.ConfigurationException e) {
@@ -641,7 +643,7 @@ public abstract class DecoderAudioRenderer<
           codecInitializedTimestamp - codecInitializingTimestamp);
       decoderCounters.decoderInitCount++;
     } catch (DecoderException e) {
-      Log.e(TAG, "Audio codec error", e);
+      log.e("Audio codec error", e); // AMZN_CHANGE_ONELINE
       eventDispatcher.audioCodecError(e);
       throw createRendererException(
           e, inputFormat, PlaybackException.ERROR_CODE_DECODER_INIT_FAILED);
@@ -763,7 +765,7 @@ public abstract class DecoderAudioRenderer<
 
     @Override
     public void onAudioSinkError(Exception audioSinkError) {
-      Log.e(TAG, "Audio sink error", audioSinkError);
+      log.e("Audio sink error", audioSinkError); // AMZN_CHANGE_ONELINE
       eventDispatcher.audioSinkError(audioSinkError);
     }
   }

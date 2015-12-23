@@ -42,6 +42,7 @@ import com.google.android.exoplayer2.util.Util;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import com.google.android.exoplayer2.util.Logger; // AMZN_CHANGE_ONELINE
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayDeque;
@@ -367,6 +368,9 @@ public final class DefaultAudioSink implements AudioSink {
   private boolean offloadDisabledUntilNextConfiguration;
   private boolean isWaitingForOffloadEndOfStreamHandled;
   // AMZN_CHANGE_BEGIN
+  private final Logger log = new Logger(Logger.Module.Audio, TAG);
+  private final boolean DBG = log.allowDebug();
+  private final boolean VDBG = log.allowVerbose();
   private static final boolean isLatencyQuirkEnabled = AmazonQuirks.isLatencyQuirkEnabled();
   private static final boolean isLegacyPassthroughQuirkEnabled = AmazonQuirks.isDolbyPassthroughQuirkEnabled();
   // AMZN_CHANGE_END
@@ -457,7 +461,7 @@ public final class DefaultAudioSink implements AudioSink {
     toFloatPcmAvailableAudioProcessors = new AudioProcessor[] {new FloatResamplingAudioProcessor()};
     volume = 1f;
     // AMZN_CHANGE_BEGIN
-    Log.i(TAG,"Amazon quirks:"
+    log.i("Amazon quirks:"
             + " Latency:" + (isLatencyQuirkEnabled ? "on" : "off")
             + "; Dolby" + (isLegacyPassthroughQuirkEnabled ? "on" : "off")
             + ". On Sdk: " + Util.SDK_INT);
@@ -816,6 +820,7 @@ public final class DefaultAudioSink implements AudioSink {
       }
 
       // Check that presentationTimeUs is consistent with the expected value.
+      log.i("Setting StartMediaTimeUs = " + startMediaTimeUs); // AMZN_CHANGE_ONELINE
       long expectedPresentationTimeUs =
           startMediaTimeUs
               + configuration.inputFramesToDurationUs(
@@ -930,6 +935,12 @@ public final class DefaultAudioSink implements AudioSink {
 
   @SuppressWarnings("ReferenceEquality")
   private void writeBuffer(ByteBuffer buffer, long avSyncPresentationTimeUs) throws WriteException {
+    // AMZN_CHANGE_BEGIN
+    if (DBG) {
+      log.d("writeBuffer : offset = " + buffer.position() + ", limit = " + buffer.limit() +
+              ", presentationTimeUs = " + avSyncPresentationTimeUs);
+    }
+    // AMZN_CHANGE_END
     if (!buffer.hasRemaining()) {
       return;
     }
@@ -1054,6 +1065,7 @@ public final class DefaultAudioSink implements AudioSink {
    */
   @Override
   public void playToEndOfStream() throws WriteException {
+    log.i("calling playToEndOfStream"); // AMZN_CHANGE_ONELINE
     if (!handledEndOfStream && isAudioTrackInitialized() && drainToEndOfStream()) {
       playPendingData();
       handledEndOfStream = true;
@@ -1164,6 +1176,7 @@ public final class DefaultAudioSink implements AudioSink {
 
   @Override
   public void setAudioSessionId(int audioSessionId) {
+    log.i("calling setAudioSessionId = " + audioSessionId); // AMZN_CHANGE_ONELINE
     if (this.audioSessionId != audioSessionId) {
       this.audioSessionId = audioSessionId;
       externalAudioSessionIdProvided = audioSessionId != C.AUDIO_SESSION_ID_UNSET;
@@ -1210,6 +1223,7 @@ public final class DefaultAudioSink implements AudioSink {
   @Override
   public void setVolume(float volume) {
     if (this.volume != volume) {
+      log.i("setVolume: volume = " + volume); // AMZN_CHANGE_ONELINE
       this.volume = volume;
       setVolumeInternal();
     }
@@ -1227,6 +1241,7 @@ public final class DefaultAudioSink implements AudioSink {
 
   @Override
   public void pause() {
+    log.i("calling pause"); // AMZN_CHANGE_ONELINE
     playing = false;
     if (isAudioTrackInitialized() && audioTrackPositionTracker.pause()) {
       audioTrack.pause();
@@ -1235,6 +1250,7 @@ public final class DefaultAudioSink implements AudioSink {
 
   @Override
   public void flush() {
+    log.i("calling flush/reset"); // AMZN_CHANGE_ONELINE
     if (isAudioTrackInitialized()) {
       resetSinkStateForFlush();
 
@@ -1265,7 +1281,9 @@ public final class DefaultAudioSink implements AudioSink {
         @Override
         public void run() {
           try {
+            log.i("audioTrack.flush"); // AMZN_CHANGE_ONELINE
             toRelease.flush();
+            log.i("audioTrack.release"); // AMZN_CHANGE_ONELINE
             toRelease.release();
           } finally {
             releasingConditionVariable.open();
@@ -1313,6 +1331,7 @@ public final class DefaultAudioSink implements AudioSink {
 
   @Override
   public void reset() {
+    log.i("calling reset"); // AMZN_CHANGE_ONELINE
     flush();
     for (AudioProcessor audioProcessor : toIntPcmAvailableAudioProcessors) {
       audioProcessor.reset();
@@ -1964,7 +1983,7 @@ public final class DefaultAudioSink implements AudioSink {
       if (failOnSpuriousAudioTimestamp) {
         throw new InvalidAudioTrackTimestampException(message);
       }
-      Log.w(TAG, message);
+      log.w(message); // AMZN_CHANGE_ONELINE
     }
 
     @Override
@@ -1989,12 +2008,12 @@ public final class DefaultAudioSink implements AudioSink {
       if (failOnSpuriousAudioTimestamp) {
         throw new InvalidAudioTrackTimestampException(message);
       }
-      Log.w(TAG, message);
+      log.w(message); // AMZN_CHANGE_ONELINE
     }
 
     @Override
     public void onInvalidLatency(long latencyUs) {
-      Log.w(TAG, "Ignoring impossibly large audio latency: " + latencyUs);
+      log.w("Ignoring impossibly large audio latency: " + latencyUs); // AMZN_CHANGE_ONELINE
     }
 
     @Override
