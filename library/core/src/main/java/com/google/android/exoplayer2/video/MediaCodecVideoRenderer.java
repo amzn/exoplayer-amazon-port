@@ -64,6 +64,10 @@ import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
+// AMZN_CHANGE_BEGIN
+import com.google.android.exoplayer2.util.Logger;
+import com.google.android.exoplayer2.util.AmazonQuirks;
+// AMZN_CHANGE_END
 
 /**
  * Decodes and renders video using {@link MediaCodec}.
@@ -169,6 +173,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   /* package */ @Nullable OnFrameRenderedListenerV23 tunnelingOnFrameRenderedListener;
   @Nullable private VideoFrameMetadataListener frameMetadataListener;
 
+  private final Logger log = new Logger(Logger.Module.Video, TAG); // AMZN_CHANGE_ONELINE
   /**
    * @param context A context.
    * @param mediaCodecSelector A decoder selector.
@@ -577,6 +582,16 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
       }
       surface = dummySurface;
     }
+
+    // AMZN_CHANGE_BEGIN
+    log.setTAG(codecName + "-" + TAG);
+    log.i("configureCodec: codecName = " + codecAdapter.getCodec() +
+            ", deviceNeedsNoPostProcessWorkaround = " + deviceNeedsNoPostProcessWorkaround +
+            ", format = " + format +
+            ", surface = " + surface +
+            ", crypto = " + crypto );
+    // AMZN_CHANGE_END
+
     codecAdapter.configure(mediaFormat, surface, crypto, 0);
     if (Util.SDK_INT >= 23 && tunneling) {
       tunnelingOnFrameRenderedListener = new OnFrameRenderedListenerV23(codecAdapter.getCodec());
@@ -638,6 +653,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   @Override
   protected void onInputFormatChanged(FormatHolder formatHolder) throws ExoPlaybackException {
     super.onInputFormatChanged(formatHolder);
+    log.i("onInputFormatChanged: format = " + formatHolder.format); // AMZN_CHANGE_ONELINE
     eventDispatcher.inputFormatChanged(formatHolder.format);
   }
 
@@ -667,6 +683,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   @Override
   protected void onOutputFormatChanged(Format format, @Nullable MediaFormat mediaFormat) {
     @Nullable MediaCodec codec = getCodec();
+    log.i("onOutputFormatChanged: outputFormat:" + mediaFormat + ", codec:" + codec); // AMZN_CHANGE_ONELINE
     if (codec != null) {
       // Must be applied each time the output format changes.
       codec.setVideoScalingMode(scalingMode);
@@ -762,7 +779,16 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
 
     long outputStreamOffsetUs = getOutputStreamOffsetUs();
     long presentationTimeUs = bufferPresentationTimeUs - outputStreamOffsetUs;
-
+    // // AMZN_CHANGE_BEGIN
+    if (log.allowDebug()) {
+      log.d("processOutputBuffer: positionUs = " + positionUs +
+          ", elapsedRealtimeUs = " + elapsedRealtimeUs +
+          ", bufferIndex = " + bufferIndex +
+          ", isDecodeOnlyBuffer = " + isDecodeOnlyBuffer +
+          ", isLastBuffer = " + isLastBuffer +
+          ", presentationTimeUs = " + bufferPresentationTimeUs);
+    }
+    // AMZN_CHANGE_END
     if (isDecodeOnlyBuffer && !isLastBuffer) {
       skipOutputBuffer(codec, bufferIndex, presentationTimeUs);
       return true;
@@ -958,6 +984,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
    * @param presentationTimeUs The presentation time of the output buffer, in microseconds.
    */
   protected void skipOutputBuffer(MediaCodec codec, int index, long presentationTimeUs) {
+    log.i("skipOutputBuffer: bufferIndex = " + index + ", PTS = " + presentationTimeUs); // AMZN_CHANGE_ONELINE
     TraceUtil.beginSection("skipVideoBuffer");
     codec.releaseOutputBuffer(index, false);
     TraceUtil.endSection();
@@ -972,6 +999,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
    * @param presentationTimeUs The presentation time of the output buffer, in microseconds.
    */
   protected void dropOutputBuffer(MediaCodec codec, int index, long presentationTimeUs) {
+    log.i("dropOutputBuffer: bufferIndex = " + index + ", PTS = " + presentationTimeUs); // AMZN_CHANGE_ONELINE
     TraceUtil.beginSection("dropVideoBuffer");
     codec.releaseOutputBuffer(index, false);
     TraceUtil.endSection();
@@ -1053,6 +1081,11 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
    * @param presentationTimeUs The presentation time of the output buffer, in microseconds.
    */
   protected void renderOutputBuffer(MediaCodec codec, int index, long presentationTimeUs) {
+    // AMZN_CHANGE_BEGIN
+    if (log.allowDebug()) {
+      log.d("renderOutputBuffer: " + index + ", PTS = " + presentationTimeUs);
+    }
+    // AMZN_CHANGE_END
     maybeNotifyVideoSizeChanged();
     TraceUtil.beginSection("releaseOutputBuffer");
     codec.releaseOutputBuffer(index, true);
@@ -1075,6 +1108,12 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   @RequiresApi(21)
   protected void renderOutputBufferV21(
       MediaCodec codec, int index, long presentationTimeUs, long releaseTimeNs) {
+    // AMZN_CHANGE_BEGIN
+    if (log.allowDebug()) {
+      log.d("renderOutputBufferV21: bufferIndex = " + index + ", PTS = " + presentationTimeUs +
+              ", releaseTimeNs = " + releaseTimeNs);
+    }
+    // AMZN_CHANGE_END
     maybeNotifyVideoSizeChanged();
     TraceUtil.beginSection("releaseOutputBuffer");
     codec.releaseOutputBuffer(index, releaseTimeNs);

@@ -64,6 +64,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.android.exoplayer2.util.Logger; // AMZN_CHANGE_ONELINE
 /**
  * An abstract renderer that uses {@link MediaCodec} to decode samples for rendering.
  */
@@ -416,6 +417,11 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
   private long outputStreamOffsetUs;
   private int pendingOutputStreamOffsetCount;
 
+  // AMZN_CHANGE_ONELINE
+  private final Logger log = new Logger(Logger.Module.AudioVideoCommon, TAG);
+  protected String codecName = "CodecNameUnknown";
+  // AMZN_CHANGE_END
+
   /**
    * @param trackType The track type that the renderer handles. One of the {@code C.TRACK_TYPE_*}
    *     constants defined in {@link C}.
@@ -727,6 +733,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
 
   @Override
   protected void onPositionReset(long positionUs, boolean joining) throws ExoPlaybackException {
+    log.i("onPositionReset: "+ positionUs + ", joining: " + joining); // AMZN_CHANGE_ONELINE
     inputStreamEnded = false;
     outputStreamEnded = false;
     pendingOutputEndOfStream = false;
@@ -791,6 +798,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
   }
 
   protected void releaseCodec() {
+    log.i("releaseCodec"); // AMZN_CHANGE_ONELINE
     try {
       if (codecAdapter != null) {
         codecAdapter.shutdown();
@@ -841,7 +849,13 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
         renderToEndOfStream();
         return;
       }
-      if (inputFormat == null && !readToFlagsOnlyBuffer(/* requireFormat= */ true)) {
+    // AMZN_CHANGE_BEGIN
+    if (log.allowVerbose()) {
+      log.v("render: positionUs = " + positionUs
+              + ", elapsedRealtimeUs = " + elapsedRealtimeUs);
+    }
+    // AMZN_CHANGE_END
+    if (inputFormat == null && !readToFlagsOnlyBuffer(/* requireFormat= */ true)) {
         // We still don't have a format and can't make progress without one.
         return;
       }
@@ -1260,8 +1274,18 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     if (inputIndex < 0) {
       inputIndex = codecAdapter.dequeueInputBufferIndex();
       if (inputIndex < 0) {
+        // AMZN_CHANGE_BEGIN
+        if (log.allowVerbose()) {
+          log.v("dequeueInputBuffer returned " + inputIndex + "... returning false");
+        }
+        // AMZN_CHANGE_END
         return false;
       }
+      // AMZN_CHANGE_BEGIN
+      if (log.allowDebug()) {
+        log.d("dequeueInputBuffer returned " + inputIndex);
+      }
+      // AMZN_CHANGE_END
       buffer.data = getInputBuffer(inputIndex);
       buffer.clear();
     }
@@ -1293,6 +1317,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     // the start of the buffer that also contains the first frame in the new format.
     if (codecReconfigurationState == RECONFIGURATION_STATE_WRITE_PENDING) {
       for (int i = 0; i < codecInputFormat.initializationData.size(); i++) {
+        log.i("Appending reconfiguration data at start of the buffer"); // AMZN_CHANGE_ONELINE
         byte[] data = codecInputFormat.initializationData.get(i);
         buffer.data.put(data);
       }
@@ -1313,9 +1338,11 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       return false;
     }
     if (result == C.RESULT_FORMAT_READ) {
+      log.i("Source returned SampleSource.FORMAT_READ"); // AMZN_CHANGE_ONELINE
       if (codecReconfigurationState == RECONFIGURATION_STATE_QUEUE_PENDING) {
         // We received two formats in a row. Clear the current buffer of any reconfiguration data
         // associated with the first format.
+        log.i("We received two formats in a row."); // AMZN_CHANGE_ONELINE
         buffer.clear();
         codecReconfigurationState = RECONFIGURATION_STATE_WRITE_PENDING;
       }
@@ -1325,6 +1352,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
 
     // We've read a buffer.
     if (buffer.isEndOfStream()) {
+      log.i("Reached end of buffer"); // AMZN_CHANGE_ONELINE
       if (codecReconfigurationState == RECONFIGURATION_STATE_QUEUE_PENDING) {
         // We received a new format immediately before the end of the stream. We need to clear
         // the corresponding reconfiguration data from the current buffer, but re-write it into
@@ -1342,6 +1370,11 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
           // Do nothing.
         } else {
           codecReceivedEos = true;
+          // AMZN_CHANGE_BEGIN
+          if (log.allowDebug()) {
+            log.d("queueInputBuffer: inputIndex = " + inputIndex + ", flag = BUFFER_FLAG_END_OF_STREAM");
+          }
+          // AMZN_CHANGE_END
           codecAdapter.queueInputBuffer(
               inputIndex,
               /* offset= */ 0,
@@ -1413,9 +1446,22 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     onQueueInputBuffer(buffer);
     try {
       if (bufferEncrypted) {
+        // AMZN_CHANGE_BEGIN
+        if (log.allowDebug()) {
+          log.d("queueSecureInputBuffer: inputIndex = " + inputIndex +
+                  ", presentationTimeUs = " + presentationTimeUs);
+        }
+        // AMZN_CHANGE_END
         codecAdapter.queueSecureInputBuffer(
             inputIndex, /* offset= */ 0, buffer.cryptoInfo, presentationTimeUs, /* flags= */ 0);
       } else {
+        // AMZN_CHANGE_BEGIN
+        if (log.allowDebug()) {
+          log.d("queueInputBuffer: inputIndex = " + inputIndex +
+                  ", bufferSize = " + buffer.data.limit() +
+                  ", presentationTimeUs = " + presentationTimeUs);
+        }
+        // AMZN_CHANGE_END
         codecAdapter.queueInputBuffer(
             inputIndex, /* offset= */ 0, buffer.data.limit(), presentationTimeUs, /* flags= */ 0);
       }
@@ -1453,6 +1499,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
    */
   @CallSuper
   protected void onInputFormatChanged(FormatHolder formatHolder) throws ExoPlaybackException {
+    log.i("onInputFormatChanged: format = " + formatHolder.format); // AMZN_CHANGE_ONELINE
     waitingForFirstSampleInFormat = true;
     Format newFormat = Assertions.checkNotNull(formatHolder.format);
     setSourceDrmSession(formatHolder.drmSession);
@@ -1757,6 +1804,11 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
    */
   private boolean drainOutputBuffer(long positionUs, long elapsedRealtimeUs)
       throws ExoPlaybackException {
+    // AMZN_CHANGE_BEGIN
+    if (log.allowVerbose()) {
+      log.v("drainOutputBuffer: positionUs = " + positionUs + ", elapsedRealtimeUs = " + elapsedRealtimeUs);
+    }
+    // AMZN_CHANGE_END
     if (!hasOutputBuffer()) {
       int outputIndex;
       if (codecNeedsEosOutputExceptionWorkaround && codecReceivedEos) {

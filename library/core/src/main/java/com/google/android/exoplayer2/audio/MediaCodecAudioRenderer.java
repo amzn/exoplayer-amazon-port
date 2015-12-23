@@ -48,6 +48,7 @@ import com.google.android.exoplayer2.mediacodec.MediaFormatUtil;
 import com.google.android.exoplayer2.util.AmazonQuirks; // AMZN_CHANGE_ONELINE
 import com.google.android.exoplayer2.util.MediaClock;
 import com.google.android.exoplayer2.util.MimeTypes;
+import com.google.android.exoplayer2.util.Logger; // AMZN_CHANGE_ONELINE
 import com.google.android.exoplayer2.util.Util;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -100,6 +101,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   private boolean allowPositionDiscontinuity;
 
   private boolean experimentalKeepAudioTrackOnSeek;
+  private final Logger log = new Logger(Logger.Module.Audio, TAG); // AMZN_CHANGE_ONELINE
 
   @Nullable private WakeupListener wakeupListener;
 
@@ -314,6 +316,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
       @Nullable MediaCrypto crypto,
       float codecOperatingRate) {
     codecMaxInputSize = getCodecMaxInputSize(codecInfo, format, getStreamFormats());
+    log.setTAG(codecInfo.name + "-" + TAG); // AMZN_CHANGE_ONELINE
     codecNeedsDiscardChannelsWorkaround = codecNeedsDiscardChannelsWorkaround(codecInfo.name);
     codecNeedsEosBufferTimestampWorkaround = codecNeedsEosBufferTimestampWorkaround(codecInfo.name);
     MediaFormat mediaFormat =
@@ -399,6 +402,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   @Override
   protected void onOutputFormatChanged(Format format, @Nullable MediaFormat mediaFormat)
       throws ExoPlaybackException {
+    log.i("onOutputFormatChanged: outputFormat:" + mediaFormat + ", codec:" + format.codecs); // AMZN_CHANGE_ONELINE
     Format audioSinkInputFormat;
     @Nullable int[] channelMap = null;
     if (decryptOnlyCodecFormat != null) { // Direct playback with a codec for decryption.
@@ -606,6 +610,16 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
         && getLargestQueuedPresentationTimeUs() != C.TIME_UNSET) {
       bufferPresentationTimeUs = getLargestQueuedPresentationTimeUs();
     }
+    // AMZN_CHANGE_BEGIN
+    if (log.allowDebug()) {
+      log.d("processOutputBuffer: positionUs = " + positionUs +
+              ", elapsedRealtimeUs =  " + elapsedRealtimeUs +
+              ", bufferIndex = " + bufferIndex +
+              ", isDecodeOnlyBuffer = " + isDecodeOnlyBuffer +
+              ", isLastBuffer = " + isLastBuffer +
+              ", bufferPresentationTimeUs = " + bufferPresentationTimeUs);
+    }
+    // AMZN_CHANGE_END
 
     if (decryptOnlyCodecFormat != null
         && (bufferFlags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
