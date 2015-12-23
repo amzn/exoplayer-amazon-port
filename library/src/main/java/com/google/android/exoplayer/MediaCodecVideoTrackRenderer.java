@@ -21,6 +21,7 @@ import com.google.android.exoplayer.util.MimeTypes;
 import com.google.android.exoplayer.util.TraceUtil;
 import com.google.android.exoplayer.util.Util;
 import com.google.android.exoplayer.util.AmazonQuirks; // AMZN_CHANGE_ONELINE
+import com.google.android.exoplayer.util.Logger;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
@@ -39,6 +40,7 @@ import java.nio.ByteBuffer;
  */
 @TargetApi(16)
 public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
+   private final String TAG = MediaCodecVideoTrackRenderer.class.getSimpleName();
 
   /**
    * Interface definition for a callback to be notified of {@link MediaCodecVideoTrackRenderer}
@@ -126,6 +128,7 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
   private int lastReportedUnappliedRotationDegrees;
   private float lastReportedPixelWidthHeightRatio;
 
+  private final Logger log = new Logger(Logger.Module.Video, TAG);
   /**
    * @param context A context.
    * @param source The upstream source from which the renderer obtains samples.
@@ -319,6 +322,13 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
   @Override
   protected void configureCodec(MediaCodec codec, String codecName, boolean codecIsAdaptive,
       android.media.MediaFormat format, MediaCrypto crypto) {
+    log.setTAG(codecName + "-" + TAG);
+    log.i("configureCodec: codecName = " + codecName +
+        " codecIsAdaptive = " + codecIsAdaptive +
+        " format = " + format +
+        " surface = " + surface +
+        " crypto = " + crypto +
+        " videoScalingMode = " + videoScalingMode);
     maybeSetMaxInputSize(format, codecIsAdaptive);
     codec.configure(format, surface, crypto, 0);
     codec.setVideoScalingMode(videoScalingMode);
@@ -331,6 +341,7 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
         : holder.format.pixelWidthHeightRatio;
     pendingRotationDegrees = holder.format.rotationDegrees == MediaFormat.NO_VALUE ? 0
         : holder.format.rotationDegrees;
+    log.i("onInputFormatChanged: format = " + holder.format);
   }
 
   /**
@@ -342,6 +353,7 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
 
   @Override
   protected void onOutputFormatChanged(android.media.MediaFormat outputFormat) {
+    log.i("onOutputFormatChanged: outputFormat = " + outputFormat);
     boolean hasCrop = outputFormat.containsKey(KEY_CROP_RIGHT)
         && outputFormat.containsKey(KEY_CROP_LEFT) && outputFormat.containsKey(KEY_CROP_BOTTOM)
         && outputFormat.containsKey(KEY_CROP_TOP);
@@ -352,6 +364,11 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
         ? outputFormat.getInteger(KEY_CROP_BOTTOM) - outputFormat.getInteger(KEY_CROP_TOP) + 1
         : outputFormat.getInteger(android.media.MediaFormat.KEY_HEIGHT);
     currentPixelWidthHeightRatio = pendingPixelWidthHeightRatio;
+    log.i("hasCrop = " + hasCrop +
+            " currentWidth = " + currentWidth +
+            " currentHeight = " + currentHeight +
+            " currentPixelWidthHeightRatio = " + currentPixelWidthHeightRatio);
+
     if (Util.SDK_INT >= 21) {
       // On API level 21 and above the decoder applies the rotation when rendering to the surface.
       // Hence currentUnappliedRotation should always be 0. For 90 and 270 degree rotations, we need
@@ -383,6 +400,13 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
   @Override
   protected boolean processOutputBuffer(long positionUs, long elapsedRealtimeUs, MediaCodec codec,
       ByteBuffer buffer, MediaCodec.BufferInfo bufferInfo, int bufferIndex, boolean shouldSkip) {
+    if (log.allowDebug()) {
+      log.d("processOutputBuffer: positionUs = " + positionUs +
+                             " elapsedRealtimeUs = " + elapsedRealtimeUs +
+                             " bufferIndex = " + bufferIndex +
+                             " shouldSkip = " + shouldSkip +
+                             " presentationTimeUs = " + bufferInfo.presentationTimeUs);
+    }
     if (shouldSkip) {
       skipOutputBuffer(codec, bufferIndex);
       consecutiveDroppedFrameCount = 0;
@@ -453,6 +477,7 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
   }
 
   protected void skipOutputBuffer(MediaCodec codec, int bufferIndex) {
+    log.i("skipOutputBuffer: bufferIndex = " + bufferIndex);
     TraceUtil.beginSection("skipVideoBuffer");
     codec.releaseOutputBuffer(bufferIndex, false);
     TraceUtil.endSection();
@@ -460,6 +485,7 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
   }
 
   protected void dropOutputBuffer(MediaCodec codec, int bufferIndex) {
+    log.i("dropOutputBuffer: bufferIndex = " + bufferIndex);
     TraceUtil.beginSection("dropVideoBuffer");
     codec.releaseOutputBuffer(bufferIndex, false);
     TraceUtil.endSection();
@@ -474,6 +500,9 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
   }
 
   protected void renderOutputBuffer(MediaCodec codec, int bufferIndex) {
+    if (log.allowDebug()) {
+      log.d("renderOutputBuffer: " + bufferIndex);
+    }
     maybeNotifyVideoSizeChanged();
     TraceUtil.beginSection("releaseOutputBuffer");
     codec.releaseOutputBuffer(bufferIndex, true);
@@ -485,6 +514,9 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
 
   @TargetApi(21)
   protected void renderOutputBufferV21(MediaCodec codec, int bufferIndex, long releaseTimeNs) {
+    if (log.allowDebug()) {
+      log.d("renderOutputBufferV21: bufferIndex = " + bufferIndex + " releaseTimeNs = " + releaseTimeNs);
+    }
     maybeNotifyVideoSizeChanged();
     TraceUtil.beginSection("releaseOutputBuffer");
     codec.releaseOutputBuffer(bufferIndex, releaseTimeNs);
@@ -542,6 +574,10 @@ public class MediaCodecVideoTrackRenderer extends MediaCodecTrackRenderer {
     final int currentHeight = this.currentHeight;
     final int currentUnappliedRotationDegrees = this.currentUnappliedRotationDegrees;
     final float currentPixelWidthHeightRatio = this.currentPixelWidthHeightRatio;
+    log.i("maybeNotifyVideoSizeChanged: width = " + currentWidth
+           + " height = " + currentHeight
+           + " currentUnappliedRotationDegrees = " + currentUnappliedRotationDegrees
+           + " currentPixelWidthHeightRatio = " + currentPixelWidthHeightRatio );
     eventHandler.post(new Runnable()  {
       @Override
       public void run() {
