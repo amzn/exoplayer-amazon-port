@@ -35,6 +35,7 @@ import com.google.android.exoplayer2.util.Util;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import com.google.android.exoplayer2.util.Logger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayDeque;
@@ -201,6 +202,7 @@ public final class DefaultAudioSink implements AudioSink {
 
   private static final String TAG = "AudioTrack";
 
+
   /** Represents states of the {@link #startMediaTimeUs} value. */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
@@ -281,6 +283,9 @@ public final class DefaultAudioSink implements AudioSink {
   private boolean tunneling;
   private long lastFeedElapsedRealtimeMs;
   // AMZN_CHANGE_BEGIN
+  private final Logger log = new Logger(Logger.Module.Audio, TAG);
+  private final boolean DBG = log.allowDebug();
+  private final boolean VDBG = log.allowVerbose();
   private static final boolean isLatencyQuirkEnabled = AmazonQuirks.isLatencyQuirkEnabled();
   private static final boolean isLegacyPassthroughQuirkEnabled = AmazonQuirks.isDolbyPassthroughQuirkEnabled();
   // AMZN_CHANGE_END
@@ -355,7 +360,7 @@ public final class DefaultAudioSink implements AudioSink {
     toIntPcmAvailableAudioProcessors = toIntPcmAudioProcessors.toArray(new AudioProcessor[0]);
     toFloatPcmAvailableAudioProcessors = new AudioProcessor[] {new FloatResamplingAudioProcessor()};
     // AMZN_CHANGE_BEGIN
-    Log.i(TAG,"Amazon quirks:"
+    log.i("Amazon quirks:"
             + " Latency:" + (isLatencyQuirkEnabled ? "on" : "off")
             + "; Dolby" + (isLegacyPassthroughQuirkEnabled ? "on" : "off")
             + ". On Sdk: " + Util.SDK_INT);
@@ -666,6 +671,7 @@ public final class DefaultAudioSink implements AudioSink {
 
       if (startMediaTimeState == START_NOT_SET) {
         startMediaTimeUs = Math.max(0, presentationTimeUs);
+        log.i("Setting StartMediaTimeUs = " + startMediaTimeUs);
         startMediaTimeState = START_IN_SYNC;
       } else {
         // Sanity check that presentationTimeUs is consistent with the expected value.
@@ -675,7 +681,7 @@ public final class DefaultAudioSink implements AudioSink {
                     getSubmittedFrames() - trimmingAudioProcessor.getTrimmedFrameCount());
         if (startMediaTimeState == START_IN_SYNC
             && Math.abs(expectedPresentationTimeUs - presentationTimeUs) > 200000) {
-          Log.e(TAG, "Discontinuity detected [expected " + expectedPresentationTimeUs + ", got "
+          log.w("Discontinuity detected [expected " + expectedPresentationTimeUs + ", got "
               + presentationTimeUs + "]");
           startMediaTimeState = START_NEED_SYNC;
         }
@@ -752,6 +758,10 @@ public final class DefaultAudioSink implements AudioSink {
 
   @SuppressWarnings("ReferenceEquality")
   private void writeBuffer(ByteBuffer buffer, long avSyncPresentationTimeUs) throws WriteException {
+    if (DBG) {
+      log.d("writeBuffer : offset = " + buffer.position() + ", limit = " + buffer.limit() +
+              ", presentationTimeUs = " + avSyncPresentationTimeUs);
+    }
     if (!buffer.hasRemaining()) {
       return;
     }
@@ -833,6 +843,7 @@ public final class DefaultAudioSink implements AudioSink {
    */
   @Override
   public void playToEndOfStream() throws WriteException {
+    log.i("calling playToEndOfStream");
     if (handledEndOfStream || !isInitialized()) {
       return;
     }
@@ -938,6 +949,7 @@ public final class DefaultAudioSink implements AudioSink {
 
   @Override
   public void setAudioSessionId(int audioSessionId) {
+    log.i("calling setAudioSessionId = " + audioSessionId);
     if (this.audioSessionId != audioSessionId) {
       this.audioSessionId = audioSessionId;
       flush();
@@ -964,6 +976,7 @@ public final class DefaultAudioSink implements AudioSink {
 
   @Override
   public void enableTunnelingV21(int tunnelingAudioSessionId) {
+    log.i("calling enableTunnelingV21 = " + tunnelingAudioSessionId);
     Assertions.checkState(Util.SDK_INT >= 21);
     if (!tunneling || audioSessionId != tunnelingAudioSessionId) {
       tunneling = true;
@@ -984,6 +997,7 @@ public final class DefaultAudioSink implements AudioSink {
   @Override
   public void setVolume(float volume) {
     if (this.volume != volume) {
+      log.i("setVolume: volume = " + volume);
       this.volume = volume;
       setVolumeInternal();
     }
@@ -1001,6 +1015,7 @@ public final class DefaultAudioSink implements AudioSink {
 
   @Override
   public void pause() {
+    log.i("calling pause");
     playing = false;
     if (isInitialized() && audioTrackPositionTracker.pause()) {
       audioTrack.pause();
@@ -1009,6 +1024,7 @@ public final class DefaultAudioSink implements AudioSink {
 
   @Override
   public void flush() {
+    log.i("calling flush/reset");
     if (isInitialized()) {
       submittedPcmBytes = 0;
       submittedEncodedFrames = 0;
@@ -1049,7 +1065,9 @@ public final class DefaultAudioSink implements AudioSink {
         @Override
         public void run() {
           try {
+            log.i("audioTrack.flush");
             toRelease.flush();
+            log.i("audioTrack.release");
             toRelease.release();
           } finally {
             releasingConditionVariable.open();
@@ -1061,6 +1079,7 @@ public final class DefaultAudioSink implements AudioSink {
 
   @Override
   public void reset() {
+    log.i("calling reset");
     flush();
     releaseKeepSessionIdAudioTrack();
     for (AudioProcessor audioProcessor : toIntPcmAvailableAudioProcessors) {
@@ -1087,6 +1106,7 @@ public final class DefaultAudioSink implements AudioSink {
     new Thread() {
       @Override
       public void run() {
+        log.i("audioTrack.release");
         toRelease.release();
       }
     }.start();
@@ -1119,7 +1139,6 @@ public final class DefaultAudioSink implements AudioSink {
         + Util.getMediaDurationForPlayoutDuration(
             positionUs - playbackParametersPositionUs, playbackParameters.speed);
   }
-
 
   private long applySkipping(long positionUs) {
     return positionUs
@@ -1289,6 +1308,7 @@ public final class DefaultAudioSink implements AudioSink {
       this.mediaTimeUs = mediaTimeUs;
       this.positionUs = positionUs;
     }
+
   }
 
   private final class PositionTrackerListener implements AudioTrackPositionTracker.Listener {
@@ -1315,7 +1335,7 @@ public final class DefaultAudioSink implements AudioSink {
       if (failOnSpuriousAudioTimestamp) {
         throw new InvalidAudioTrackTimestampException(message);
       }
-      Log.w(TAG, message);
+      log.w(message);
     }
 
     @Override
@@ -1340,12 +1360,12 @@ public final class DefaultAudioSink implements AudioSink {
       if (failOnSpuriousAudioTimestamp) {
         throw new InvalidAudioTrackTimestampException(message);
       }
-      Log.w(TAG, message);
+      log.w(message);
     }
 
     @Override
     public void onInvalidLatency(long latencyUs) {
-      Log.w(TAG, "Ignoring impossibly large audio latency: " + latencyUs);
+      log.w("Ignoring impossibly large audio latency: " + latencyUs);
     }
 
     @Override
