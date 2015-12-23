@@ -47,6 +47,7 @@ import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.AmazonQuirks;
 import com.google.android.exoplayer2.util.MediaClock;
 import com.google.android.exoplayer2.util.MimeTypes;
+import com.google.android.exoplayer2.util.Logger;
 import com.google.android.exoplayer2.util.Util;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -103,6 +104,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   private long lastInputTimeUs;
   private int pendingStreamChangeCount;
 
+  private final Logger log = new Logger(Logger.Module.Audio, TAG);
   /**
    * @param context A context.
    * @param mediaCodecSelector A decoder selector.
@@ -464,6 +466,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
       @Nullable MediaCrypto crypto,
       float codecOperatingRate) {
     codecMaxInputSize = getCodecMaxInputSize(codecInfo, format, getStreamFormats());
+    log.setTAG(codecInfo.name + "-" + TAG); // AMZN_CHANGE_ONELINE
     codecNeedsDiscardChannelsWorkaround = codecNeedsDiscardChannelsWorkaround(codecInfo.name);
     codecNeedsEosBufferTimestampWorkaround = codecNeedsEosBufferTimestampWorkaround(codecInfo.name);
     passthroughEnabled = codecInfo.passthrough;
@@ -563,6 +566,8 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   @Override
   protected void onOutputFormatChanged(MediaCodec codec, MediaFormat outputMediaFormat)
       throws ExoPlaybackException {
+    log.i("onOutputFormatChanged: outputFormat:" + outputMediaFormat
+            + ", codec:" + codec); // AMZN_CHANGE_ONELINE
     @C.Encoding int encoding;
     MediaFormat mediaFormat;
     if (passthroughMediaFormat != null) {
@@ -815,6 +820,17 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
         && lastInputTimeUs != C.TIME_UNSET) {
       bufferPresentationTimeUs = lastInputTimeUs;
     }
+
+    // AMZN_CHANGE_BEGIN
+    if (log.allowDebug()) {
+      log.d("processOutputBuffer: positionUs = " + positionUs +
+              ", elapsedRealtimeUs =  " + elapsedRealtimeUs +
+              ", bufferIndex = " + bufferIndex +
+              ", isDecodeOnlyBuffer = " + isDecodeOnlyBuffer +
+              ", isLastBuffer = " + isLastBuffer +
+              ", bufferPresentationTimeUs = " + bufferPresentationTimeUs);
+    }
+    // AMZN_CHANGE_END
 
     if (passthroughEnabled && (bufferFlags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
       // Discard output buffers from the passthrough (raw) decoder containing codec specific data.
