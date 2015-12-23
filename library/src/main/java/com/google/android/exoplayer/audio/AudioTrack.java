@@ -1239,6 +1239,9 @@ public final class AudioTrack {
       } catch (NoSuchMethodException e) {
         // There's no guarantee this method exists. Do nothing.
         Log.w(TAG, "getTimestamp method not found");
+      } catch (NoClassDefFoundError e) {
+        //We are using > 16 API so AudioTimestamp is not available
+        Log.w(TAG, "AudioTimeStamp class not found");
       }
     }
 
