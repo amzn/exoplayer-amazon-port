@@ -56,6 +56,7 @@ import com.google.android.exoplayer2.util.AmazonQuirks; // AMZN_CHANGE_ONELINE
 import com.google.android.exoplayer2.util.MediaClock;
 import com.google.android.exoplayer2.util.MediaFormatUtil;
 import com.google.android.exoplayer2.util.MimeTypes;
+import com.google.android.exoplayer2.util.Logger; // AMZN_CHANGE_ONELINE
 import com.google.android.exoplayer2.util.Util;
 import com.google.common.collect.ImmutableList;
 import java.nio.ByteBuffer;
@@ -105,7 +106,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   private boolean allowFirstBufferPositionDiscontinuity;
   private boolean allowPositionDiscontinuity;
   private boolean audioSinkNeedsReset;
-
+  private final Logger log = new Logger(Logger.Module.Audio, TAG); // AMZN_CHANGE_ONELINE
   private boolean experimentalKeepAudioTrackOnSeek;
 
   @Nullable private WakeupListener wakeupListener;
@@ -418,6 +419,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
       @Nullable MediaCrypto crypto,
       float codecOperatingRate) {
     codecMaxInputSize = getCodecMaxInputSize(codecInfo, format, getStreamFormats());
+    log.setTAG(codecInfo.name + "-" + TAG); // AMZN_CHANGE_ONELINE
     codecNeedsDiscardChannelsWorkaround = codecNeedsDiscardChannelsWorkaround(codecInfo.name);
     MediaFormat mediaFormat =
         getMediaFormat(format, codecInfo.codecMimeType, codecMaxInputSize, codecOperatingRate);
@@ -485,7 +487,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
 
   @Override
   protected void onCodecError(Exception codecError) {
-    Log.e(TAG, "Audio codec error", codecError);
+    log.e("Audio codec error", codecError); // AMZN_CHANGE_ONELINE
     eventDispatcher.audioCodecError(codecError);
   }
 
@@ -502,6 +504,8 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   protected void onOutputFormatChanged(Format format, @Nullable MediaFormat mediaFormat)
       throws ExoPlaybackException {
     Format audioSinkInputFormat;
+    log.i("onOutputFormatChanged: outputFormat:" + mediaFormat
+            + ", codec:" + format.codecs); // AMZN_CHANGE_ONELINE
     @Nullable int[] channelMap = null;
     if (decryptOnlyCodecFormat != null) { // Direct playback with a codec for decryption.
       audioSinkInputFormat = decryptOnlyCodecFormat;
@@ -691,6 +695,17 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
       Format format)
       throws ExoPlaybackException {
     checkNotNull(buffer);
+
+    // AMZN_CHANGE_BEGIN
+    if (log.allowDebug()) {
+      log.d("processOutputBuffer: positionUs = " + positionUs +
+              ", elapsedRealtimeUs =  " + elapsedRealtimeUs +
+              ", bufferIndex = " + bufferIndex +
+              ", isDecodeOnlyBuffer = " + isDecodeOnlyBuffer +
+              ", isLastBuffer = " + isLastBuffer +
+              ", bufferPresentationTimeUs = " + bufferPresentationTimeUs);
+    }
+    // AMZN_CHANGE_END
 
     if (decryptOnlyCodecFormat != null
         && (bufferFlags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
@@ -946,7 +961,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
 
     @Override
     public void onAudioSinkError(Exception audioSinkError) {
-      Log.e(TAG, "Audio sink error", audioSinkError);
+      log.e("Audio sink error", audioSinkError); // AMZN_CHANGE_ONELINE
       eventDispatcher.audioSinkError(audioSinkError);
     }
   }
