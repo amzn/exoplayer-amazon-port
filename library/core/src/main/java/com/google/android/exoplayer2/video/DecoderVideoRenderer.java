@@ -49,6 +49,7 @@ import com.google.android.exoplayer2.drm.DrmSession.DrmSessionException;
 import com.google.android.exoplayer2.source.SampleStream.ReadDataResult;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Log;
+import com.google.android.exoplayer2.util.Logger; // AMZN_CHANGE_ONELINE
 import com.google.android.exoplayer2.util.TimedValueQueue;
 import com.google.android.exoplayer2.util.TraceUtil;
 import com.google.android.exoplayer2.util.Util;
@@ -76,6 +77,7 @@ import java.lang.annotation.Target;
 public abstract class DecoderVideoRenderer extends BaseRenderer {
 
   private static final String TAG = "DecoderVideoRenderer";
+  private final Logger log = new Logger(Logger.Module.Video, TAG); // AMZN_CHANGE_ONELINE
 
   /** Decoder reinitialization states. */
   @Documented
@@ -215,7 +217,7 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
         while (feedInputBuffer()) {}
         TraceUtil.endSection();
       } catch (DecoderException e) {
-        Log.e(TAG, "Video codec error", e);
+        log.e("Video codec error", e); // AMZN_CHANGE_ONELINE
         eventDispatcher.videoCodecError(e);
         throw createRendererException(e, inputFormat, PlaybackException.ERROR_CODE_DECODING_FAILED);
       }
@@ -704,7 +706,7 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
           decoderInitializedTimestamp - decoderInitializingTimestamp);
       decoderCounters.decoderInitCount++;
     } catch (DecoderException e) {
-      Log.e(TAG, "Video codec error", e);
+      log.e("Video codec error", e); // AMZN_CHANGE_ONELINE
       eventDispatcher.videoCodecError(e);
       throw createRendererException(
           e, inputFormat, PlaybackException.ERROR_CODE_DECODER_INIT_FAILED);
