@@ -40,6 +40,7 @@ import com.google.android.exoplayer2.mediacodec.MediaCodecUtil.DecoderQueryExcep
 import com.google.android.exoplayer2.util.AmazonQuirks;
 import com.google.android.exoplayer2.util.MediaClock;
 import com.google.android.exoplayer2.util.MimeTypes;
+import com.google.android.exoplayer2.util.Logger;
 import com.google.android.exoplayer2.util.Util;
 import java.nio.ByteBuffer;
 
@@ -74,6 +75,9 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   private long currentPositionUs;
   private boolean allowFirstBufferPositionDiscontinuity;
   private boolean allowPositionDiscontinuity;
+
+  private static final String TAG = MediaCodecAudioRenderer.class.getSimpleName();
+  private final Logger log = new Logger(Logger.Module.Audio, TAG);
 
   /**
    * @param mediaCodecSelector A decoder selector.
@@ -255,6 +259,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   @Override
   protected void configureCodec(MediaCodecInfo codecInfo, MediaCodec codec, Format format,
       MediaCrypto crypto) {
+    log.setTAG (codecInfo.name + "-" + TAG); // AMZN_CHANGE_ONELINE
     codecNeedsDiscardChannelsWorkaround = codecNeedsDiscardChannelsWorkaround(codecInfo.name);
     MediaFormat mediaFormat = getMediaFormatForPlayback(format);
     if (passthroughEnabled) {
@@ -296,6 +301,8 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   @Override
   protected void onOutputFormatChanged(MediaCodec codec, MediaFormat outputFormat)
       throws ExoPlaybackException {
+    log.i("onOutputFormatChanged: outputFormat:" + outputFormat
+            + ", codec:" + codec);
     @C.Encoding int encoding;
     MediaFormat format;
     if (passthroughMediaFormat != null) {
@@ -453,6 +460,17 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   protected boolean processOutputBuffer(long positionUs, long elapsedRealtimeUs, MediaCodec codec,
       ByteBuffer buffer, int bufferIndex, int bufferFlags, long bufferPresentationTimeUs,
       boolean shouldSkip) throws ExoPlaybackException {
+
+    // AMZN_CHANGE_BEGIN
+    if (log.allowDebug()) {
+      log.d("processOutputBuffer: positionUs = " + positionUs +
+              ", elapsedRealtimeUs =  " + elapsedRealtimeUs +
+              ", bufferIndex = " + bufferIndex +
+              ", shouldSkip = " + shouldSkip +
+              ", bufferPresentationTimeUs = " + bufferPresentationTimeUs);
+    }
+    // AMZN_CHANGE_END
+
     if (passthroughEnabled && (bufferFlags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
       // Discard output buffers from the passthrough (raw) decoder containing codec specific data.
       codec.releaseOutputBuffer(bufferIndex, false);

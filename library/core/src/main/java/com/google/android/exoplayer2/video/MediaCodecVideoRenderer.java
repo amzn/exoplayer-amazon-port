@@ -50,6 +50,8 @@ import com.google.android.exoplayer2.util.TraceUtil;
 import com.google.android.exoplayer2.util.Util;
 import com.google.android.exoplayer2.video.VideoRendererEventListener.EventDispatcher;
 import java.nio.ByteBuffer;
+import com.google.android.exoplayer2.util.Logger;
+import com.google.android.exoplayer2.util.AmazonQuirks;
 
 /**
  * Decodes and renders video using {@link MediaCodec}.
@@ -125,6 +127,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   private long outputStreamOffsetUs;
   private int pendingOutputStreamOffsetCount;
 
+  private final Logger log = new Logger(Logger.Module.Video, TAG);
   /**
    * @param context A context.
    * @param mediaCodecSelector A decoder selector.
@@ -426,6 +429,16 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
       }
       surface = dummySurface;
     }
+
+    // AMZN_CHANGE_BEGIN
+    log.setTAG(codecName + "-" + TAG);
+    log.i("configureCodec: codecName = " + codec +
+            ", deviceNeedsAutoFrcWorkaround = " + deviceNeedsAutoFrcWorkaround +
+            ", format = " + format +
+            ", surface = " + surface +
+            ", crypto = " + crypto );
+    // AMZN_CHANGE_END
+
     codec.configure(mediaFormat, surface, crypto, 0);
     if (Util.SDK_INT >= 23 && tunneling) {
       tunnelingOnFrameRenderedListener = new OnFrameRenderedListenerV23(codec);
@@ -466,6 +479,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   @Override
   protected void onInputFormatChanged(Format newFormat) throws ExoPlaybackException {
     super.onInputFormatChanged(newFormat);
+    log.i("onInputFormatChanged: format = " + newFormat);
     eventDispatcher.inputFormatChanged(newFormat);
     pendingPixelWidthHeightRatio = getPixelWidthHeightRatio(newFormat);
     pendingRotationDegrees = getRotationDegrees(newFormat);
@@ -487,6 +501,8 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
 
   @Override
   protected void onOutputFormatChanged(MediaCodec codec, MediaFormat outputFormat) {
+    log.i("onOutputFormatChanged: outputFormat:" + outputFormat
+            + ", codec:" + codec);
     boolean hasCrop = outputFormat.containsKey(KEY_CROP_RIGHT)
         && outputFormat.containsKey(KEY_CROP_LEFT) && outputFormat.containsKey(KEY_CROP_BOTTOM)
         && outputFormat.containsKey(KEY_CROP_TOP);
@@ -497,6 +513,10 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
         ? outputFormat.getInteger(KEY_CROP_BOTTOM) - outputFormat.getInteger(KEY_CROP_TOP) + 1
         : outputFormat.getInteger(MediaFormat.KEY_HEIGHT);
     currentPixelWidthHeightRatio = pendingPixelWidthHeightRatio;
+    log.i("hasCrop = " + hasCrop +
+            ", currentWidth = " + currentWidth +
+            ", currentHeight = " + currentHeight +
+            ", currentPixelWidthHeightRatio = " + currentPixelWidthHeightRatio);
     if (Util.SDK_INT >= 21) {
       // On API level 21 and above the decoder applies the rotation when rendering to the surface.
       // Hence currentUnappliedRotation should always be 0. For 90 and 270 degree rotations, we need
@@ -535,6 +555,14 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
           pendingOutputStreamOffsetCount);
     }
     long presentationTimeUs = bufferPresentationTimeUs - outputStreamOffsetUs;
+
+    if (log.allowDebug()) {
+      log.d("processOutputBuffer: positionUs = " + positionUs +
+              ", elapsedRealtimeUs = " + elapsedRealtimeUs +
+              ", bufferIndex = " + bufferIndex +
+              ", shouldSkip = " + shouldSkip +
+              ", presentationTimeUs = " + bufferPresentationTimeUs);
+    }
 
     if (shouldSkip) {
       skipOutputBuffer(codec, bufferIndex, presentationTimeUs);
@@ -676,6 +704,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
    * @param presentationTimeUs The presentation time of the output buffer, in microseconds.
    */
   protected void skipOutputBuffer(MediaCodec codec, int index, long presentationTimeUs) {
+    log.i("skipOutputBuffer: bufferIndex = " + index + ", PTS = " + presentationTimeUs);
     TraceUtil.beginSection("skipVideoBuffer");
     codec.releaseOutputBuffer(index, false);
     TraceUtil.endSection();
@@ -690,6 +719,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
    * @param presentationTimeUs The presentation time of the output buffer, in microseconds.
    */
   protected void dropOutputBuffer(MediaCodec codec, int index, long presentationTimeUs) {
+    log.i("dropOutputBuffer: bufferIndex = " + index + ", PTS = " + presentationTimeUs);
     TraceUtil.beginSection("dropVideoBuffer");
     codec.releaseOutputBuffer(index, false);
     TraceUtil.endSection();
@@ -748,6 +778,9 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
    * @param presentationTimeUs The presentation time of the output buffer, in microseconds.
    */
   protected void renderOutputBuffer(MediaCodec codec, int index, long presentationTimeUs) {
+    if (log.allowDebug()) {
+      log.d("renderOutputBuffer: " + index + ", PTS = " + presentationTimeUs);
+    }
     maybeNotifyVideoSizeChanged();
     TraceUtil.beginSection("releaseOutputBuffer");
     codec.releaseOutputBuffer(index, true);
@@ -770,6 +803,10 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   @TargetApi(21)
   protected void renderOutputBufferV21(
       MediaCodec codec, int index, long presentationTimeUs, long releaseTimeNs) {
+    if (log.allowDebug()) {
+      log.d("renderOutputBufferV21: bufferIndex = " + index + ", PTS = " + presentationTimeUs +
+              ", releaseTimeNs = " + releaseTimeNs);
+    }
     maybeNotifyVideoSizeChanged();
     TraceUtil.beginSection("releaseOutputBuffer");
     codec.releaseOutputBuffer(index, releaseTimeNs);
