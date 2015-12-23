@@ -22,6 +22,7 @@ import android.media.MediaCodec.CryptoException;
 import android.media.MediaCrypto;
 import android.os.Handler;
 import android.os.SystemClock;
+import android.util.Log;
 import com.google.android.exoplayer.MediaCodecUtil.DecoderQueryException;
 import com.google.android.exoplayer.drm.DrmInitData;
 import com.google.android.exoplayer.drm.DrmSessionManager;
@@ -30,7 +31,11 @@ import com.google.android.exoplayer.util.Assertions;
 import com.google.android.exoplayer.util.NalUnitUtil;
 import com.google.android.exoplayer.util.TraceUtil;
 import com.google.android.exoplayer.util.Util;
-import com.google.android.exoplayer.util.AmazonQuirks; // AMZN_CHANGE_ONELINE
+// AMZN_CHANGE_BEGIN
+import com.google.android.exoplayer.util.MimeTypes;
+import com.google.android.exoplayer.util.Logger;
+import com.google.android.exoplayer.util.AmazonQuirks;
+// AMZN_CHANGE_END
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +46,7 @@ import java.util.List;
 @TargetApi(16)
 public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer {
 
+  private final String TAG = MediaCodecTrackRenderer.class.getSimpleName();
   /**
    * Interface definition for a callback to be notified of {@link MediaCodecTrackRenderer} events.
    */
@@ -246,6 +252,11 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
   private boolean waitingForKeys;
   private boolean waitingForFirstSyncFrame;
 
+  // AMZN_CHANGE_ONELINE
+  private final Logger log = new Logger(Logger.Module.AudioVideoCommon, TAG);
+  protected String codecName = "CodecNameUnknown";
+  // AMZN_CHANGE_END
+
   /**
    * @param source The upstream source from which the renderer obtains samples.
    * @param mediaCodecSelector A decoder selector.
@@ -350,6 +361,7 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
     }
 
     String mimeType = format.mimeType;
+    log.i("mimeType = " + mimeType);
     MediaCrypto mediaCrypto = null;
     boolean requiresSecureDecoder = false;
     if (drmInitData != null) {
@@ -383,6 +395,7 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
       }
     }
 
+    log.i("requiresSecureDecoder = " + requiresSecureDecoder);
     DecoderInfo decoderInfo = null;
     try {
       decoderInfo = getDecoderInfo(mediaCodecSelector, mimeType, requiresSecureDecoder);
@@ -396,7 +409,7 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
           requiresSecureDecoder, DecoderInitializationException.NO_SUITABLE_DECODER_ERROR));
     }
 
-    String codecName = decoderInfo.name;
+    codecName = decoderInfo.name; // AMZN_CHANGE_ONELINE
     codecIsAdaptive = decoderInfo.adaptive;
     codecNeedsDiscardToSpsWorkaround = codecNeedsDiscardToSpsWorkaround(codecName, format);
     codecNeedsFlushWorkaround = codecNeedsFlushWorkaround(codecName);
@@ -424,6 +437,14 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
       notifyAndThrowDecoderInitError(new DecoderInitializationException(format, e,
           requiresSecureDecoder, codecName));
     }
+    log.setTAG(codecName + "-" + TAG);
+    if (MimeTypes.isAudio(mimeType)) {
+        log.setModule(Logger.Module.Audio);
+    } else {
+        log.setModule(Logger.Module.Video);
+    }
+    log.i("Created Decoder " +
+        (codecIsAdaptive ? " and Codec is Adaptive " : " and Codec is NOT Adaptive"));
     codecHotswapTimeMs = getState() == TrackRenderer.STATE_STARTED ?
         SystemClock.elapsedRealtime() : -1;
     inputIndex = -1;
@@ -469,6 +490,7 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
   }
 
   protected void releaseCodec() {
+    log.i("releaseCodec");
     if (codec != null) {
       codecHotswapTimeMs = -1;
       inputIndex = -1;
@@ -506,6 +528,7 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
 
   @Override
   protected void onDiscontinuity(long positionUs) throws ExoPlaybackException {
+    log.i("seekTo:"+ positionUs);
     sourceState = SOURCE_STATE_NOT_READY;
     inputStreamEnded = false;
     outputStreamEnded = false;
@@ -530,6 +553,12 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
     sourceState = sourceIsReady
         ? (sourceState == SOURCE_STATE_NOT_READY ? SOURCE_STATE_READY : sourceState)
         : SOURCE_STATE_NOT_READY;
+
+    if (log.allowVerbose()) {
+      log.v("doSomeWork: positionUs = " + positionUs
+              + " elapsedRealtimeUs = " + elapsedRealtimeUs
+              + " sourceIsReady = " + sourceIsReady);
+    }
     if (format == null) {
       readFormat(positionUs);
     }
@@ -601,7 +630,13 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
     if (inputIndex < 0) {
       inputIndex = codec.dequeueInputBuffer(0);
       if (inputIndex < 0) {
+        if (log.allowVerbose()) {
+          log.v("dequeueInputBuffer returned " + inputIndex + "... returning false");
+        }
         return false;
+      }
+      if (log.allowDebug()) {
+        log.d("dequeueInputBuffer returned " + inputIndex);
       }
       sampleHolder.data = inputBuffers[inputIndex];
       sampleHolder.clearData();
@@ -632,12 +667,13 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
 
     int result;
     if (waitingForKeys) {
-      // We've already read an encrypted sample into sampleHolder, and are waiting for keys.
+      log.i("We've already read an encrypted sample into sampleHolder, and are waiting for keys");
       result = SampleSource.SAMPLE_READ;
     } else {
       // For adaptive reconfiguration OMX decoders expect all reconfiguration data to be supplied
       // at the start of the buffer that also contains the first frame in the new format.
       if (codecReconfigurationState == RECONFIGURATION_STATE_WRITE_PENDING) {
+        log.i("Appending reconfiguration data at start of the buffer");
         for (int i = 0; i < format.initializationData.size(); i++) {
           byte[] data = format.initializationData.get(i);
           sampleHolder.data.put(data);
@@ -654,9 +690,11 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
       return false;
     }
     if (result == SampleSource.FORMAT_READ) {
+      log.i("Source returned SampleSource.FORMAT_READ");
       if (codecReconfigurationState == RECONFIGURATION_STATE_QUEUE_PENDING) {
         // We received two formats in a row. Clear the current buffer of any reconfiguration data
         // associated with the first format.
+        log.i("We received two formats in a row.");
         sampleHolder.clearData();
         codecReconfigurationState = RECONFIGURATION_STATE_WRITE_PENDING;
       }
@@ -664,6 +702,7 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
       return true;
     }
     if (result == SampleSource.END_OF_STREAM) {
+      log.i("Source returned  SampleSource.END_OF_STREAM");
       if (codecReconfigurationState == RECONFIGURATION_STATE_QUEUE_PENDING) {
         // We received a new format immediately before the end of the stream. We need to clear
         // the corresponding reconfiguration data from the current buffer, but re-write it into
@@ -677,10 +716,14 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
         return false;
       }
       try {
+
         if (codecNeedsEosPropagationWorkaround) {
           // Do nothing.
         } else {
           codecReceivedEos = true;
+          if (log.allowDebug()) {
+            log.d("queueInputBuffer: inputIndex = " + inputIndex + "flag = BUFFER_FLAG_END_OF_STREAM");
+          }
           codec.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
           inputIndex = -1;
         }
@@ -693,11 +736,15 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
     if (waitingForFirstSyncFrame) {
       // TODO: Find out if it's possible to supply samples prior to the first sync
       // frame for HE-AAC.
+      log.i("waiting for First Sync Frame");
       if (!sampleHolder.isSyncFrame()) {
+        log.i("Did not get Sync Frame!!!");
         sampleHolder.clearData();
         if (codecReconfigurationState == RECONFIGURATION_STATE_QUEUE_PENDING) {
           // The buffer we just cleared contained reconfiguration data. We need to re-write this
           // data into a subsequent buffer (if there is one).
+          log.i("The buffer we just cleared contained reconfiguration data. We need to re-write this" +
+                    "data into a subsequent buffer");
           codecReconfigurationState = RECONFIGURATION_STATE_WRITE_PENDING;
         }
         return true;
@@ -729,8 +776,17 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
       if (sampleEncrypted) {
         MediaCodec.CryptoInfo cryptoInfo = getFrameworkCryptoInfo(sampleHolder,
             adaptiveReconfigurationBytes);
+        if (log.allowDebug()) {
+          log.d("queueSecureInputBuffer: inputIndex = " + inputIndex +
+                                  " presentationTimeUs = " + presentationTimeUs);
+        }
         codec.queueSecureInputBuffer(inputIndex, 0, cryptoInfo, presentationTimeUs, 0);
       } else {
+        if (log.allowDebug()) {
+          log.d("queueInputBuffer: inputIndex = " + inputIndex +
+                                "bufferSize = " + bufferSize +
+                                "presentationTimeUs = " + presentationTimeUs);
+        }
         codec.queueInputBuffer(inputIndex, 0, bufferSize, presentationTimeUs, 0);
       }
       inputIndex = -1;
@@ -790,6 +846,7 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
    * @throws ExoPlaybackException If an error occurs reinitializing the {@link MediaCodec}.
    */
   protected void onInputFormatChanged(MediaFormatHolder formatHolder) throws ExoPlaybackException {
+    log.i("onInputFormatChanged: format = " + formatHolder.format);
     MediaFormat oldFormat = format;
     format = formatHolder.format;
     drmInitData = formatHolder.drmInitData;
@@ -807,6 +864,7 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
         codecReinitializationState = REINITIALIZATION_STATE_SIGNAL_END_OF_STREAM;
       } else {
         // There aren't any final output buffers, so perform re-initialization immediately.
+        log.i("releasing and reiniting codec");
         releaseCodec();
         maybeInitCodec();
       }
@@ -925,6 +983,9 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
   @SuppressWarnings("deprecation")
   private boolean drainOutputBuffer(long positionUs, long elapsedRealtimeUs)
       throws ExoPlaybackException {
+    if (log.allowVerbose()) {
+      log.v("drainOutputBuffer: positionUs = " + positionUs + " elapsedRealtimeUs = " + elapsedRealtimeUs);
+    }
     if (outputStreamEnded) {
       return false;
     }
@@ -934,15 +995,21 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
     }
 
     if (outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+      log.i("INFO_OUTPUT_FORMAT_CHANGED");
       processOutputFormat();
       return true;
     } else if (outputIndex == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED) {
+      log.i("INFO_OUTPUT_BUFFERS_CHANGED");
       outputBuffers = codec.getOutputBuffers();
       codecCounters.outputBuffersChangedCount++;
       return true;
     } else if (outputIndex < 0) {
+      if (log.allowVerbose()) {
+        log.v("dequeueOutputBuffer: outputIndex = " + outputIndex);
+      }
       if (codecNeedsEosPropagationWorkaround && (inputStreamEnded
           || codecReinitializationState == REINITIALIZATION_STATE_WAIT_END_OF_STREAM)) {
+        log.i("dequeueOutputBuffer: processEndOfStream will be called while codecNeedsEosPropagationWorkaround is set." );
         processEndOfStream();
         return true;
       }
@@ -950,6 +1017,9 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
     }
 
     if (shouldSkipAdaptationWorkaroundOutputBuffer) {
+      if (log.allowDebug()) {
+        log.d("skipping adaptation workaround output buffer. Releasing outputIndex = " + outputIndex);
+      }
       shouldSkipAdaptationWorkaroundOutputBuffer = false;
       codec.releaseOutputBuffer(outputIndex, false);
       outputIndex = -1;
@@ -957,10 +1027,10 @@ public abstract class MediaCodecTrackRenderer extends SampleSourceTrackRenderer 
     }
 
     if ((outputBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+      log.i("dequeueOutputBuffer: BUFFER_FLAG_END_OF_STREAM" );
       processEndOfStream();
       return false;
     }
-
     int decodeOnlyIndex = getDecodeOnlyIndex(outputBufferInfo.presentationTimeUs);
     if (processOutputBuffer(positionUs, elapsedRealtimeUs, codec, outputBuffers[outputIndex],
         outputBufferInfo, outputIndex, decodeOnlyIndex != -1)) {
