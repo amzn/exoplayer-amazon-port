@@ -58,8 +58,8 @@ import android.util.Log;
   }
 
   public static boolean isDolbyPassthroughQuirkEnabled() {
-    // Sets dolby passthrough quirk for Amazon Fire TV  Family
-    return isFireTVFamily();
+    // Sets dolby passthrough quirk for Amazon Fire TV Gen1  Family
+    return isFireTVGen1Family();
   }
 
   public static boolean isAmazonDevice(){
