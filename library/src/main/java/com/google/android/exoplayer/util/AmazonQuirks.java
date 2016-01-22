@@ -36,6 +36,7 @@ public final class AmazonQuirks {
   private static final int WAIT_AFTER_RELEASE_AUDIO_TRACK_TIME_MS = 1000;
   private static final int MAX_INPUT_AVC_SIZE_FIRETV_GEN2 = (int) (2.8 * 1024 * 1024);
   private static final long FIRETV_GEN2_FOS5_DOLBY_FIX_OS_BUILD_NUM = 537170700;
+  private static final long FIRETV_GEN2_FOS5_PR_CLEAR_FIX_OS_BUILD_NUM = 550078110;
   //caching
   private static final boolean isAmazonDevice;
   private static final boolean isFireTVGen1;
@@ -167,5 +168,9 @@ public final class AmazonQuirks {
     }
     return true;
 
+  }
+
+  public static boolean codecNeedsEosPropagationWorkaround(String name) {
+    return (isFireTVGen2() && fireTVFireOsBuildVersion <= FIRETV_GEN2_FOS5_PR_CLEAR_FIX_OS_BUILD_NUM);
   }
 }
