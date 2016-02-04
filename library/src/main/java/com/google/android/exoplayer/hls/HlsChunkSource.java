@@ -158,6 +158,7 @@ public class HlsChunkSource implements HlsTrackSelector.Output {
   private byte[] encryptionKey;
   private String encryptionIvString;
   private byte[] encryptionIv;
+  private int initialStartingBitrate; //AMZN_CHANGE_ONELINE
 
   /**
    * @param isMaster True if this is the master source for the playback. False otherwise. Each
@@ -180,7 +181,7 @@ public class HlsChunkSource implements HlsTrackSelector.Output {
       PtsTimestampAdjusterProvider timestampAdjusterProvider, int adaptiveMode) {
     this(isMaster, dataSource, playlistUrl, playlist, trackSelector, bandwidthMeter,
         timestampAdjusterProvider, adaptiveMode, DEFAULT_MIN_BUFFER_TO_SWITCH_UP_MS,
-        DEFAULT_MAX_BUFFER_TO_SWITCH_DOWN_MS);
+        DEFAULT_MAX_BUFFER_TO_SWITCH_DOWN_MS, 0); //AMZN_CHANGE_ONELINE
   }
 
   /**
@@ -202,11 +203,17 @@ public class HlsChunkSource implements HlsTrackSelector.Output {
    *     for a switch to a higher quality variant to be considered.
    * @param maxBufferDurationToSwitchDownMs The maximum duration of media that needs to be buffered
    *     for a switch to a lower quality variant to be considered.
+   * @param startingBitrate The bitrate (bits per second) that should be considered for initial variant selection.
+   *     If bitrate is 0 or if it cannot find a variant lower than desired bit rate,
+   *     it falls back to default behaviour.
+   *     This overrides the default behaviour of selecting the first variant in the playlist.
    */
   public HlsChunkSource(boolean isMaster, DataSource dataSource, String playlistUrl,
       HlsPlaylist playlist, HlsTrackSelector trackSelector, BandwidthMeter bandwidthMeter,
       PtsTimestampAdjusterProvider timestampAdjusterProvider, int adaptiveMode,
-      long minBufferDurationToSwitchUpMs, long maxBufferDurationToSwitchDownMs) {
+      long minBufferDurationToSwitchUpMs, long maxBufferDurationToSwitchDownMs,
+      int startingBitrate) { //AMZN_CHANGE_ONELINE
+    initialStartingBitrate = startingBitrate; //AMZN_CHANGE_ONELINE
     this.isMaster = isMaster;
     this.dataSource = dataSource;
     this.trackSelector = trackSelector;
@@ -631,6 +638,7 @@ public class HlsChunkSource implements HlsTrackSelector.Output {
     int maxHeight = -1;
 
     int minOriginalVariantIndex = Integer.MAX_VALUE;
+    int desiredStartingBitrateVariantIndex = -1; //AMZN_CHANGE_ONELINE
     for (int i = 0; i < variants.length; i++) {
       int originalVariantIndex = playlist.variants.indexOf(variants[i]);
       if (originalVariantIndex < minOriginalVariantIndex) {
@@ -640,7 +648,18 @@ public class HlsChunkSource implements HlsTrackSelector.Output {
       Format variantFormat = variants[i].format;
       maxWidth = Math.max(variantFormat.width, maxWidth);
       maxHeight = Math.max(variantFormat.height, maxHeight);
+      //AMZN_CHANGE_BEGIN
+      if(initialStartingBitrate > 0 && desiredStartingBitrateVariantIndex == -1
+            && variantFormat.bitrate <= initialStartingBitrate) {
+        //variants are already sorted by bitrate.
+        desiredStartingBitrateVariantIndex = i;
+      }
     }
+    if(desiredStartingBitrateVariantIndex != -1) {
+      //if we found a variant that matched, use it. Otherwise use whatever the default is
+      // which in this case will correspond to first variant in the manifest
+      defaultVariantIndex = desiredStartingBitrateVariantIndex;
+    } //AMZN_CHANGE_END
     // TODO: We should allow the default values to be passed through the constructor.
     // TODO: Print a warning if resolution tags are omitted.
     maxWidth = maxWidth > 0 ? maxWidth : 1920;
