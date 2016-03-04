@@ -291,9 +291,6 @@ public final class MediaFormat {
       maybeSetIntegerV16(format, android.media.MediaFormat.KEY_SAMPLE_RATE, sampleRate);
       maybeSetIntegerV16(format, "encoder-delay", encoderDelay);
       maybeSetIntegerV16(format, "encoder-padding", encoderPadding);
-      for (int i = 0; i < initializationData.size(); i++) {
-        format.setByteBuffer("csd-" + i, ByteBuffer.wrap(initializationData.get(i)));
-      }
       // AMZN_CHANGE_BEGIN
       if ( AmazonQuirks.shouldSkipCSDInConfigure(mimeType) ){
         //log.i("Not sending Video CSD in configure for Amazon Fire TV Gen2!!!");
