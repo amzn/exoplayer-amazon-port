@@ -243,6 +243,8 @@ public final class AudioTrack {
       } catch (NoSuchMethodException e) {
         // There's no guarantee this method exists. Do nothing.
         log.w("getDirectTrackAudioFormat method not found");
+      } catch (Throwable e) {
+        log.w("getDirectTrackAudioFormat method not found. thr");
       }
     }
     if (Util.SDK_INT >= 19) {
@@ -445,7 +447,7 @@ public final class AudioTrack {
    */
   public void reconfigure(MediaFormat format, int specifiedBufferSize) {
     log.i("reconfigure: format = " + format +
-                     " specifiedBufferSize = " + specifiedBufferSize);
+            " specifiedBufferSize = " + specifiedBufferSize);
     int channelCount = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
     int channelConfig;
     switch (channelCount) {
@@ -481,7 +483,7 @@ public final class AudioTrack {
       log.i("Invoking getDirectTrackAudioFormat with mimeType = " + mimeType +
             " and encoding format = " + encoding);
       try {
-          encoding  = (Integer) getDirectTrackAudioFormat.invoke(AudioTrack.class,
+          encoding  = (Integer) getDirectTrackAudioFormat.invoke(android.media.AudioTrack.class,
                                                                   mimeType, encoding);
           log.i("We got new encoding format as " + encoding);
       } catch (Exception e) {
@@ -1038,6 +1040,8 @@ public final class AudioTrack {
       } catch (NoSuchMethodException e) {
         // There's no guarantee this method exists. Do nothing.
         log.w("getTimestamp method not found");
+      } catch (Throwable e) {
+        log.w("getTimeStamp could not be found");
       }
     }
 
