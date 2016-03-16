@@ -1079,7 +1079,7 @@ public final class AudioTrack {
       log.i("Invoking getDirectTrackAudioFormat with mimeType = " + mimeType +
               " and encoding format = " + encoding);
       try {
-        encoding  = (Integer) getDirectTrackAudioFormat.invoke(AudioTrack.class,
+        encoding  = (Integer) getDirectTrackAudioFormat.invoke(android.media.AudioTrack.class,
                 mimeType, encoding);
         log.i("We got new encoding format as " + encoding);
       } catch (Exception e) {
@@ -1175,6 +1175,11 @@ public final class AudioTrack {
       } catch (NoSuchMethodException e) {
         // There's no guarantee this method exists. Do nothing.
         log.w("getTimestamp method not found");
+      } catch (NoClassDefFoundError e) {
+        //We are using > 16 API so AudioTimestamp is not available
+        log.w("AudioTimeStamp class not found");
+      } catch(Throwable e) {
+        log.w("getTimestamp not found");
       }
     }
 
