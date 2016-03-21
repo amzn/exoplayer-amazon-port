@@ -1280,8 +1280,8 @@ public final class AudioTrack {
       this.getLatencyMethod = getLatencyMethod;
       try {
         getTimestamp = AudioTrack.class.getMethod("getTimestamp", AudioTimestamp.class);
-      } catch (Exception e) {
-        // There's no guarantee this method exists. Do nothing.
+      } catch (Throwable e) {
+        // There's no guarantee this method or class exists. Do nothing.
         log.w("getTimestamp method not found");
       }
     }
