@@ -460,7 +460,8 @@ import java.util.concurrent.atomic.AtomicInteger;
     this.bufferedPositionUs = bufferedPositionUs;
 
     if (allRenderersEnded
-        && (durationUs == TrackRenderer.UNKNOWN_TIME_US || durationUs <= positionUs)) {
+        && (durationUs == TrackRenderer.UNKNOWN_TIME_US || durationUs <= positionUs
+            || enabledRenderers.size() > 0)) { //AMZN_CHANGE_ONELINE
       setState(ExoPlayer.STATE_ENDED);
       stopRenderers();
     } else if (state == ExoPlayer.STATE_BUFFERING && allRenderersReadyOrEnded) {
