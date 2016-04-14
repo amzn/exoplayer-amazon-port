@@ -29,20 +29,22 @@ public final class AmazonQuirks {
   private static final String FIRETV_GEN1_DEVICE_MODEL = "AFTB";
   private static final String FIRETV_STICK_DEVICE_MODEL = "AFTM";
   private static final String FIRETV_GEN2_DEVICE_MODEL = "AFTS";
+  private static final String KINDLE_TABLET_DEVICE_MODEL = "KF";
   private static final String AMAZON = "Amazon";
   private static final String DEVICEMODEL = Build.MODEL;
   private static final String MANUFACTURER = Build.MANUFACTURER;
   private static final int AUDIO_HARDWARE_LATENCY_FOR_TABLETS = 90000;
   private static final int WAIT_AFTER_RELEASE_AUDIO_TRACK_TIME_MS = 1000;
   private static final int MAX_INPUT_AVC_SIZE_FIRETV_GEN2 = (int) (2.8 * 1024 * 1024);
-  private static final long FIRETV_GEN2_FOS5_DOLBY_FIX_OS_BUILD_NUM = 537170700;
   private static final long FIRETV_GEN2_FOS5_PR_CLEAR_FIX_OS_BUILD_NUM = 550078110;
+
   //caching
   private static final boolean isAmazonDevice;
   private static final boolean isFireTVGen1;
   private static final boolean isFireTVStick;
   private static final boolean isFireTVGen2;
   private static final long fireTVFireOsBuildVersion;
+  private static final boolean isKindleTablet;
 
   static {// This static block must be at the end
     //Init ordering is important within this block
@@ -50,6 +52,7 @@ public final class AmazonQuirks {
     isFireTVGen1 = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN1_DEVICE_MODEL);
     isFireTVStick = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_STICK_DEVICE_MODEL);
     isFireTVGen2 = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN2_DEVICE_MODEL);
+    isKindleTablet = isAmazonDevice && DEVICEMODEL.startsWith(KINDLE_TABLET_DEVICE_MODEL);
     fireTVFireOsBuildVersion = getBuildVersion();
   }
 
@@ -68,8 +71,7 @@ public final class AmazonQuirks {
 
   public static boolean isLatencyQuirkEnabled() {
     // Sets latency quirk for Amazon KK and JB Tablets
-    return ( (Util.SDK_INT <= 19) &&
-             isAmazonDevice() && (!isFireTVFamily()) );
+    return ( (Util.SDK_INT <= 19) && isKindleTablet );
   }
 
   public static int getAudioHWLatency() {
@@ -88,7 +90,7 @@ public final class AmazonQuirks {
     return isAmazonDevice;
   }
 
-  public static boolean isFireTVFamily() {
+  public static boolean shouldExtractPlayReadyHeader() {
     return isFireTVGen1Family() || isFireTVGen2();
   }
 
@@ -124,29 +126,16 @@ public final class AmazonQuirks {
   // We assume that this function is called only for supported
   // passthrough mimetypes such as AC3, EAC3 etc
   public static boolean useDefaultPassthroughDecoder() {
-    if (!isAmazonDevice() ||
-            (isFireTVGen2 && fireTVFireOsBuildVersion >= FIRETV_GEN2_FOS5_DOLBY_FIX_OS_BUILD_NUM) ) {
-      Log.i(TAG,"using default pass-through decoder");
-      return true;
-    }
     //Use platform decoder for
     //FireTV Gen1
     //FireTV Stick
-    //FireTV Gen2 OS Build version without Dolby Fixes &
-    //Fire Tablets
-    Log.i(TAG,"using platform Dolby decoder");
-    return false;
-  }
-
-  public static boolean waitAfterReleaseAudioTrackQuirk() {
-    if (isFireTVGen2() &&
-            (fireTVFireOsBuildVersion >= FIRETV_GEN2_FOS5_DOLBY_FIX_OS_BUILD_NUM)) {
-       android.os.SystemClock.sleep(WAIT_AFTER_RELEASE_AUDIO_TRACK_TIME_MS);
-       return true;
+    if (isFireTVGen1Family()) {
+      Log.i(TAG,"using platform Dolby decoder");
+      return false;
     }
-    return false;
+    Log.i(TAG,"using default Dolby pass-through decoder");
+    return true;
   }
-
 
   /* In Fire TV Gen1 family of devices, there is a platform limitation that
    * codec cannot be initialized with a crypto object before the DRM keys are

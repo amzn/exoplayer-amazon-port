@@ -902,11 +902,6 @@ public final class AudioTrack {
             log.i("calling release");
             toRelease.release();
           } finally {
-            // AMZN_CHANGE_BEGIN
-            if (passthrough && AmazonQuirks.waitAfterReleaseAudioTrackQuirk()) {
-              log.i("introduced delay after track release");
-            }
-            // AMZN_CHANGE_END
             releasingConditionVariable.open();
           }
         }
