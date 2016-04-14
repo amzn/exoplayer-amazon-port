@@ -27,11 +27,11 @@ import android.util.Log;
   private static final String FIRETV_GEN1_DEVICE_MODEL = "AFTB";
   private static final String FIRETV_STICK_DEVICE_MODEL = "AFTM";
   private static final String FIRETV_GEN2_DEVICE_MODEL = "AFTS";
+  private static final String KINDLE_TABLET_DEVICE_MODEL = "KF";
   private static final String AMAZON = "Amazon";
   private static final String DEVICEMODEL = Build.MODEL;
   private static final String MANUFACTURER = Build.MANUFACTURER;
   private static final int AUDIO_HARDWARE_LATENCY_FOR_TABLETS = 90000;
-  private static final int WAIT_AFTER_RELEASE_AUDIO_TRACK_TIME_MS = 1000;
 
   public static boolean isAdaptive(String mimeType) {
     if (mimeType == null || mimeType.isEmpty()) {
@@ -43,10 +43,13 @@ import android.util.Log;
                 mimeType.equalsIgnoreCase(MimeTypes.VIDEO_MP4)) );
   }
 
+  public static boolean isKindleTablet() {
+    return ( isAmazonDevice() && DEVICEMODEL.startsWith(KINDLE_TABLET_DEVICE_MODEL) );
+  }
+
   public static boolean isLatencyQuirkEnabled() {
     // Sets latency quirk for Amazon KK and JB Tablets
-    return ( (Util.SDK_INT <= 19) &&
-             isAmazonDevice() && (!isFireTVFamily()) );
+    return ( (Util.SDK_INT <= 19) && isKindleTablet() );
   }
 
   public static int getAudioHWLatency() {
@@ -65,7 +68,7 @@ import android.util.Log;
     return MANUFACTURER.equalsIgnoreCase(AMAZON);
   }
 
-  public static boolean isFireTVFamily() {
+  public static boolean shouldExtractPlayReadyHeader() {
     return ( isFireTVGen1Family() || isFireTVGen2() );
   }
 
@@ -90,20 +93,15 @@ import android.util.Log;
   }
 
   public static boolean useDefaultPassthroughDecoder() {
-    if (!isAmazonDevice() || isFireTVGen2() ) {
-      Log.i(TAG,"using default Dolby pass-through decoder");
-      return true;
+    //Use platform decoder for
+    //FireTV Gen1
+    //FireTV Stick
+    if (isFireTVGen1Family()) {
+      Log.i(TAG,"using platform Dolby decoder");
+      return false;
     }
-    Log.i(TAG,"using platform Dolby decoder");
-    return false;
-  }
-
-  public static boolean waitAfterReleaseAudioTrackQuirk() {
-    if (isFireTVGen2()) {
-       android.os.SystemClock.sleep(WAIT_AFTER_RELEASE_AUDIO_TRACK_TIME_MS);
-       return true;
-    }
-    return false;
+    Log.i(TAG,"using default Dolby pass-through decoder");
+    return true;
   }
 
   /* In Fire TV Gen1 family of devices, there is a platform limitation that
