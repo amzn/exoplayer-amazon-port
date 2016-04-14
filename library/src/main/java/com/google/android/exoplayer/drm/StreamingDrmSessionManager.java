@@ -290,7 +290,7 @@ public class StreamingDrmSessionManager implements DrmSessionManager {
         extractSchemeSpecificData = true;
       }
 
-      if (AmazonQuirks.isFireTVFamily() && uuid.equals(PLAYREADY_UUID)) {
+      if (AmazonQuirks.shouldExtractPlayReadyHeader() && uuid.equals(PLAYREADY_UUID)) {
         // PlayReady support on Amazon Fire TV devices require the PlayReady
         // header to be extracted from the PSSH
         extractSchemeSpecificData = true;
