@@ -159,7 +159,11 @@ public final class AmazonQuirks {
 
   }
 
-  public static boolean codecNeedsEosPropagationWorkaround(String name) {
-    return (isFireTVGen2() && fireTVFireOsBuildVersion <= FIRETV_GEN2_FOS5_PR_CLEAR_FIX_OS_BUILD_NUM);
+  public static boolean codecNeedsEosPropagationWorkaround(String codecName) {
+    boolean needsWorkaround = isFireTVGen2() && codecName.endsWith(".secure");
+    if (needsWorkaround) {
+      Log.i(TAG, "Codec Needs EOS Propagation Workaround " + codecName);
+    }
+    return needsWorkaround;
   }
 }
