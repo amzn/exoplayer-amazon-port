@@ -131,4 +131,12 @@ import android.util.Log;
      public static boolean waitForDRMKeysBeforeInitCodec() {
          return isFireTVGen1Family();
      }
+
+     public static boolean codecNeedsEosPropagationWorkaround(String codecName) {
+         boolean needsWorkaround = isFireTVGen2() && codecName.endsWith(".secure");
+         if (needsWorkaround) {
+             Log.i(TAG, "Codec Needs EOS Propagation Workaround " + codecName);
+         }
+         return needsWorkaround;
+     }
  }
