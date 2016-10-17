@@ -34,6 +34,7 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.audio.AudioProcessor.UnhandledAudioFormatException;
+import com.google.android.exoplayer2.util.AmazonQuirks; // AMZN_CHANGE_ONELINE
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.MimeTypes;
@@ -329,6 +330,9 @@ public final class DefaultAudioSink implements AudioSink {
   private long lastFeedElapsedRealtimeMs;
   private boolean offloadDisabledUntilNextConfiguration;
   private boolean isWaitingForOffloadEndOfStreamHandled;
+  // AMZN_CHANGE_BEGIN
+  private static final boolean isLegacyPassthroughQuirkEnabled = AmazonQuirks.isDolbyPassthroughQuirkEnabled();
+  // AMZN_CHANGE_END
 
   /**
    * Creates a new default audio sink.
@@ -440,6 +444,16 @@ public final class DefaultAudioSink implements AudioSink {
   public void setListener(Listener listener) {
     this.listener = listener;
   }
+  // AMZN_CHANGE_BEGIN
+  // This API is called from MediaCodecAudioTrackRenderer to skip
+  // calling hasPendingData  to detect if the playback has ended or not since these APIs
+  // always return true and fake the buffering state of audio track.
+  // there is no way for us to depend on the audio track states to decide
+  // if the playback has ended or not.
+  public boolean applyDolbyPassthroughQuirk() {
+    return (configuration.outputMode != OUTPUT_MODE_PCM && isLegacyPassthroughQuirkEnabled);
+  }
+  // AMZN_CHANGE_END
 
   @Override
   public boolean supportsFormat(Format format) {
@@ -635,7 +649,8 @@ public final class DefaultAudioSink implements AudioSink {
         /* isPassthrough= */ configuration.outputMode == OUTPUT_MODE_PASSTHROUGH,
         configuration.outputEncoding,
         configuration.outputPcmFrameSize,
-        configuration.bufferSize);
+        configuration.bufferSize,
+        applyDolbyPassthroughQuirk()); // AMZN_CHANGE_ONELINE
     setVolumeInternal();
 
     if (auxEffectInfo.effectId != AuxEffectInfo.NO_AUX_EFFECT_ID) {
@@ -879,7 +894,9 @@ public final class DefaultAudioSink implements AudioSink {
       Assertions.checkArgument(outputBuffer == buffer);
     } else {
       outputBuffer = buffer;
-      if (Util.SDK_INT < 21) {
+      // AMZN: we need to copy data to temp buffer in case of dolby passthrough also
+      // irrespective of SDK version.
+      if (Util.SDK_INT < 21 || applyDolbyPassthroughQuirk()) { // AMZN_CHANGE_ONELINE
         int bytesRemaining = buffer.remaining();
         if (preV21OutputBuffer == null || preV21OutputBuffer.length < bytesRemaining) {
           preV21OutputBuffer = new byte[bytesRemaining];
@@ -892,7 +909,23 @@ public final class DefaultAudioSink implements AudioSink {
     }
     int bytesRemaining = buffer.remaining();
     int bytesWrittenOrError = 0; // Error if negative
-    if (Util.SDK_INT < 21) { // outputMode == OUTPUT_MODE_PCM.
+
+    // AMZN_CHANGE_BEGIN
+    // for dolby passthrough case, just write into the DolbyPassthroughAudioTrack
+    // since its implementation is different than standard pcm audio track.
+    // The DolbyPassthroughAudioTrack takes care of writing only in play state
+    // and also writes into the track asynchronously. Also, we
+    // cannot depend on playback head position to decide how much more data to write.
+    if (applyDolbyPassthroughQuirk()) {
+      // if there are no free buffers in AudioTrack, the write returns 0, indicating
+      // it did not consume the buffer.
+      bytesWrittenOrError = audioTrack.write(preV21OutputBuffer, preV21OutputBufferOffset, bytesRemaining);
+      if (bytesWrittenOrError > 0) {
+        preV21OutputBufferOffset += bytesWrittenOrError;
+        buffer.position(buffer.position() + bytesWrittenOrError);
+      }
+    } else if (Util.SDK_INT < 21) { // outputMode == OUTPUT_MODE_PCM.
+      // AMZN_CHANGE_END
       // Work out how many bytes we can write without the risk of blocking.
       int bytesToWrite = audioTrackPositionTracker.getAvailableBufferSize(writtenPcmBytes);
       if (bytesToWrite > 0) {
@@ -971,6 +1004,11 @@ public final class DefaultAudioSink implements AudioSink {
     }
   }
 
+  /**
+   * Plays out remaining audio. {@link #isEnded()} will return {@code true} when playback has ended.
+   *
+   * @throws WriteException If an error occurs draining data to the track.
+   */
   @Override
   public void playToEndOfStream() throws WriteException {
     if (!handledEndOfStream && isAudioTrackInitialized() && drainToEndOfStream()) {
@@ -1026,7 +1064,8 @@ public final class DefaultAudioSink implements AudioSink {
 
   @Override
   public boolean isEnded() {
-    return !isAudioTrackInitialized() || (handledEndOfStream && !hasPendingData());
+    return !isAudioTrackInitialized() || (handledEndOfStream &&
+            (applyDolbyPassthroughQuirk() || !hasPendingData())); // AMZN_CHANGE_ONELINE
   }
 
   @Override
@@ -1223,7 +1262,8 @@ public final class DefaultAudioSink implements AudioSink {
         /* isPassthrough= */ configuration.outputMode == OUTPUT_MODE_PASSTHROUGH,
         configuration.outputEncoding,
         configuration.outputPcmFrameSize,
-        configuration.bufferSize);
+        configuration.bufferSize,
+        applyDolbyPassthroughQuirk()); // AMZN_CHANGE_ONELINE
 
     startMediaTimeUsNeedsInit = true;
   }
@@ -1753,7 +1793,12 @@ public final class DefaultAudioSink implements AudioSink {
   private void playPendingData() {
     if (!stoppedAudioTrack) {
       stoppedAudioTrack = true;
-      audioTrackPositionTracker.handleEndOfStream(getWrittenFrames());
+      // The audio processors have drained, so drain the underlying audio track.
+      // AMZN_CHANGE_BEGIN
+      if (!applyDolbyPassthroughQuirk()) {
+        audioTrackPositionTracker.handleEndOfStream(getWrittenFrames());
+      }
+      // AMZN_CHANGE_END
       audioTrack.stop();
       bytesUntilNextAvSync = 0;
     }
@@ -1969,6 +2014,11 @@ public final class DefaultAudioSink implements AudioSink {
       return (durationUs * outputSampleRate) / C.MICROS_PER_SECOND;
     }
 
+    // AMZN_CHANGE_BEGIN
+    public boolean applyDolbyPassthroughQuirk() {
+      return ( outputMode != OUTPUT_MODE_PCM  && isLegacyPassthroughQuirkEnabled);
+    }
+    // AMZN_CHANGE_END
     public AudioTrack buildAudioTrack(
         boolean tunneling, AudioAttributes audioAttributes, int audioSessionId)
         throws InitializationException {
@@ -2037,35 +2087,72 @@ public final class DefaultAudioSink implements AudioSink {
     @RequiresApi(21)
     private AudioTrack createAudioTrackV21(
         boolean tunneling, AudioAttributes audioAttributes, int audioSessionId) {
-      return new AudioTrack(
-          getAudioTrackAttributesV21(audioAttributes, tunneling),
-          getAudioFormat(outputSampleRate, outputChannelConfig, outputEncoding),
-          bufferSize,
-          AudioTrack.MODE_STREAM,
-          audioSessionId);
+      // AMZN_CHANGE_BEGIN
+      audioSessionId = audioSessionId != C.AUDIO_SESSION_ID_UNSET ? audioSessionId
+              : AudioManager.AUDIO_SESSION_ID_GENERATE;
+      if (applyDolbyPassthroughQuirk()) {
+        return new DolbyPassthroughAudioTrack(
+                getAudioTrackAttributesV21(audioAttributes, tunneling),
+                getAudioFormat(outputSampleRate, outputChannelConfig, outputEncoding),
+                bufferSize,
+                AudioTrack.MODE_STREAM,
+                audioSessionId);
+      } else {
+        return new AudioTrack(
+                getAudioTrackAttributesV21(audioAttributes, tunneling),
+                getAudioFormat(outputSampleRate, outputChannelConfig, outputEncoding),
+                bufferSize,
+                AudioTrack.MODE_STREAM,
+                audioSessionId);
+
+      }
+      // AMZN_CHANGE_END
     }
 
     private AudioTrack createAudioTrackV9(AudioAttributes audioAttributes, int audioSessionId) {
       int streamType = Util.getStreamTypeForAudioUsage(audioAttributes.usage);
+      // AMZN_CHANGE_BEGIN
       if (audioSessionId == C.AUDIO_SESSION_ID_UNSET) {
-        return new AudioTrack(
-            streamType,
-            outputSampleRate,
-            outputChannelConfig,
-            outputEncoding,
-            bufferSize,
-            AudioTrack.MODE_STREAM);
+        if (applyDolbyPassthroughQuirk()) {
+          return new DolbyPassthroughAudioTrack(streamType,
+                  outputSampleRate,
+                  outputChannelConfig,
+                  outputEncoding,
+                  bufferSize,
+                  AudioTrack.MODE_STREAM);
+        }
+        else {
+          return new AudioTrack(
+                  streamType,
+                  outputSampleRate,
+                  outputChannelConfig,
+                  outputEncoding,
+                  bufferSize,
+                  AudioTrack.MODE_STREAM);
+        }
       } else {
         // Re-attach to the same audio session.
-        return new AudioTrack(
-            streamType,
-            outputSampleRate,
-            outputChannelConfig,
-            outputEncoding,
-            bufferSize,
-            AudioTrack.MODE_STREAM,
-            audioSessionId);
+        if (applyDolbyPassthroughQuirk()) {
+          return new DolbyPassthroughAudioTrack(streamType,
+                  outputSampleRate,
+                  outputChannelConfig,
+                  outputEncoding,
+                  bufferSize,
+                  AudioTrack.MODE_STREAM,
+                  audioSessionId);
+        }
+        else {
+          return new AudioTrack(
+                  streamType,
+                  outputSampleRate,
+                  outputChannelConfig,
+                  outputEncoding,
+                  bufferSize,
+                  AudioTrack.MODE_STREAM,
+                  audioSessionId);
+        }
       }
+      // AMZN_CHANGE_END
     }
 
     private int computeBufferSize(

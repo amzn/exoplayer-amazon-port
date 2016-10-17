@@ -50,6 +50,7 @@ import com.google.android.exoplayer2.mediacodec.MediaCodecSelector;
 import com.google.android.exoplayer2.mediacodec.MediaCodecUtil;
 import com.google.android.exoplayer2.mediacodec.MediaCodecUtil.DecoderQueryException;
 import com.google.android.exoplayer2.mediacodec.MediaFormatUtil;
+import com.google.android.exoplayer2.util.AmazonQuirks; // AMZN_CHANGE_ONELINE
 import com.google.android.exoplayer2.util.MediaClock;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
@@ -318,7 +319,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
     if (mimeType == null) {
       return Collections.emptyList();
     }
-    if (audioSink.supportsFormat(format)) {
+    if (audioSink.supportsFormat(format) && AmazonQuirks.useDefaultPassthroughDecoder()) { // AMZN_CHANGE_ONELINE
       // The format is supported directly, so a codec is only needed for decryption.
       @Nullable MediaCodecInfo codecInfo = MediaCodecUtil.getDecryptOnlyDecoderInfo();
       if (codecInfo != null) {
@@ -441,7 +442,16 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
         pcmEncoding = mediaFormat.getInteger(MediaFormat.KEY_PCM_ENCODING);
       } else if (mediaFormat.containsKey(VIVO_BITS_PER_SAMPLE_KEY)) {
         pcmEncoding = Util.getPcmEncoding(mediaFormat.getInteger(VIVO_BITS_PER_SAMPLE_KEY));
-      } else {
+      }
+      // AMZN_CHANGE_BEGIN
+      else if (AmazonQuirks.isAmazonDevice()) {
+        // In Amazon Devices, some platform dolby decoders may output mime types depending on the
+        // audio capabilities of the connected device and Dolby settings. So, as a general rule, if
+        // platform decoder is being used instead of OMX.google.raw.decoder, need to
+        // configure audio track based on the output mime type returned by the media codec.
+        pcmEncoding = MimeTypes.getEncoding(mediaFormat.getString(MediaFormat.KEY_MIME), format.codecs);
+      } // AMZN_CHANGE_END
+      else {
         // If the format is anything other than PCM then we assume that the audio decoder will
         // output 16-bit PCM.
         pcmEncoding =
