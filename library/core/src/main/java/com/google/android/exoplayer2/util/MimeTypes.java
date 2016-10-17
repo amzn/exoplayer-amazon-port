@@ -54,6 +54,7 @@ public final class MimeTypes {
   public static final String AUDIO_AC3 = BASE_TYPE_AUDIO + "/ac3";
   public static final String AUDIO_E_AC3 = BASE_TYPE_AUDIO + "/eac3";
   public static final String AUDIO_E_AC3_JOC = BASE_TYPE_AUDIO + "/eac3-joc";
+  public static final String AUDIO_CUSTOM_EC3 = BASE_TYPE_AUDIO + "/ec3";
   public static final String AUDIO_TRUEHD = BASE_TYPE_AUDIO + "/true-hd";
   public static final String AUDIO_DTS = BASE_TYPE_AUDIO + "/vnd.dts";
   public static final String AUDIO_DTS_HD = BASE_TYPE_AUDIO + "/vnd.dts.hd";
@@ -314,6 +315,7 @@ public final class MimeTypes {
     switch (mimeType) {
       case MimeTypes.AUDIO_AC3:
         return C.ENCODING_AC3;
+      case MimeTypes.AUDIO_CUSTOM_EC3: // AMZN_CHANGE_ONELINE
       case MimeTypes.AUDIO_E_AC3:
       case MimeTypes.AUDIO_E_AC3_JOC:
         return C.ENCODING_E_AC3;
@@ -323,6 +325,10 @@ public final class MimeTypes {
         return C.ENCODING_DTS_HD;
       case MimeTypes.AUDIO_TRUEHD:
         return C.ENCODING_DOLBY_TRUEHD;
+      // AMZN_CHANGE_BEGIN
+      case MimeTypes.AUDIO_RAW:
+        return C.ENCODING_PCM_16BIT;
+      // AMZN_CHANGE_END
       default:
         return C.ENCODING_INVALID;
     }
