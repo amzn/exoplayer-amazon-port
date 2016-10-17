@@ -37,6 +37,7 @@ import com.google.android.exoplayer2.mediacodec.MediaCodecInfo;
 import com.google.android.exoplayer2.mediacodec.MediaCodecRenderer;
 import com.google.android.exoplayer2.mediacodec.MediaCodecSelector;
 import com.google.android.exoplayer2.mediacodec.MediaCodecUtil.DecoderQueryException;
+import com.google.android.exoplayer2.util.AmazonQuirks;
 import com.google.android.exoplayer2.util.MediaClock;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
@@ -227,7 +228,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   @Override
   protected MediaCodecInfo getDecoderInfo(MediaCodecSelector mediaCodecSelector,
       Format format, boolean requiresSecureDecoder) throws DecoderQueryException {
-    if (allowPassthrough(format.sampleMimeType)) {
+    if (allowPassthrough(format.sampleMimeType) && AmazonQuirks.useDefaultPassthroughDecoder()) { // AMZN_CHANGE_ONELINE
       MediaCodecInfo passthroughDecoderInfo = mediaCodecSelector.getPassthroughDecoderInfo();
       if (passthroughDecoderInfo != null) {
         passthroughEnabled = true;
@@ -301,9 +302,17 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
       encoding = MimeTypes.getEncoding(passthroughMediaFormat.getString(MediaFormat.KEY_MIME));
       format = passthroughMediaFormat;
     } else {
-      encoding = pcmEncoding;
+      // AMZN_CHANGE_BEGIN
+      // In Amazon Devices, some platform dolby decoders may output mime types depending on the
+      // audio capabilities of the connected device and Dolby settings. So, as a general rule, if
+      // platform decoder is being used instead of OMX.google.raw.decoder, need to
+      // configure audio track based on the output mime type returned by the media codec.
       format = outputFormat;
+      encoding = AmazonQuirks.isAmazonDevice() ?
+              MimeTypes.getEncoding(format.getString(MediaFormat.KEY_MIME)) : pcmEncoding;
+      // AMZN_CHANGE_END
     }
+
     int channelCount = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
     int sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE);
     int[] channelMap;

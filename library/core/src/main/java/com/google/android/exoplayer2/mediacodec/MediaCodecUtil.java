@@ -158,7 +158,7 @@ public final class MediaCodecUtil {
             + ". Assuming: " + decoderInfos.get(0).name);
       }
     }
-    if (MimeTypes.AUDIO_E_AC3_JOC.equals(mimeType)) {
+    if (MimeTypes.AUDIO_ATMOS.equals(mimeType)) {
       // E-AC3 decoders can decode JOC streams, but in 2-D rather than 3-D.
       CodecKey eac3Key = new CodecKey(MimeTypes.AUDIO_E_AC3, key.secure);
       ArrayList<MediaCodecInfo> eac3DecoderInfos =
@@ -383,7 +383,7 @@ public final class MediaCodecUtil {
     }
 
     // MTK E-AC3 decoder doesn't support decoding JOC streams in 2-D. See [Internal: b/69400041].
-    if (MimeTypes.AUDIO_E_AC3_JOC.equals(requestedMimeType)
+    if (MimeTypes.AUDIO_ATMOS.equals(requestedMimeType)
         && "OMX.MTK.AUDIO.DECODER.DSPAC3".equals(name)) {
       return false;
     }
