@@ -44,6 +44,7 @@ import com.google.android.exoplayer2.mediacodec.MediaCodecUtil.DecoderQueryExcep
 import com.google.android.exoplayer2.mediacodec.MediaFormatUtil;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.util.Log;
+import com.google.android.exoplayer2.util.AmazonQuirks;
 import com.google.android.exoplayer2.util.MediaClock;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
@@ -418,7 +419,8 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
     if (mimeType == null) {
       return Collections.emptyList();
     }
-    if (allowPassthrough(format.channelCount, mimeType)) {
+    if (allowPassthrough(format.channelCount, mimeType)
+            && AmazonQuirks.useDefaultPassthroughDecoder()) { // AMZN_CHANGE_ONELINE
       @Nullable
       MediaCodecInfo passthroughDecoderInfo = mediaCodecSelector.getPassthroughDecoderInfo();
       if (passthroughDecoderInfo != null) {
@@ -574,7 +576,14 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
       if (outputMediaFormat.containsKey(VIVO_BITS_PER_SAMPLE_KEY)) {
         encoding = Util.getPcmEncoding(outputMediaFormat.getInteger(VIVO_BITS_PER_SAMPLE_KEY));
       } else {
-        encoding = getPcmEncoding(inputFormat);
+        // AMZN_CHANGE_BEGIN
+        // In Amazon Devices, some platform dolby decoders may output mime types depending on the
+        // audio capabilities of the connected device and Dolby settings. So, as a general rule, if
+        // platform decoder is being used instead of OMX.google.raw.decoder, need to
+        // configure audio track based on the output mime type returned by the media codec.
+        encoding = AmazonQuirks.isAmazonDevice() ?
+                MimeTypes.getEncoding(mediaFormat.getString(MediaFormat.KEY_MIME)) : getPcmEncoding(inputFormat);
+        // AMZN_CHANGE_END
       }
     }
     int channelCount = mediaFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
