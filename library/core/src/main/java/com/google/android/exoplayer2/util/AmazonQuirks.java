@@ -27,16 +27,21 @@ public final class AmazonQuirks {
     private static final String FIRETV_STICK_DEVICE_MODEL      = "AFTM";
     private static final String FIRETV_STICK_GEN2_DEVICE_MODEL = "AFTT";
     private static final String KINDLE_TABLET_DEVICE_MODEL     = "KF";
+    private static final String FIRE_PHONE_DEVICE_MODEL        = "SD";
     private static final String AMAZON                         = "Amazon";
 
     private static final String DEVICEMODEL  = Build.MODEL;
     private static final String MANUFACTURER = Build.MANUFACTURER;
+
+    private static final int AUDIO_HARDWARE_LATENCY_FOR_TABLETS = 90000;
 
     //caching
     private static final boolean isAmazonDevice;
     private static final boolean isFireTVGen1;
     private static final boolean isFireTVStick;
     private static final boolean isFireTVGen2;
+    private static final boolean isKindleTablet;
+    private static final boolean isFirePhone;
 
     // This static block must be the last
     //INIT ORDERING IS IMPORTANT IN THIS BLOCK!
@@ -45,6 +50,8 @@ public final class AmazonQuirks {
         isFireTVGen1   = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN1_DEVICE_MODEL);
         isFireTVGen2   = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN2_DEVICE_MODEL);
         isFireTVStick  = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_STICK_DEVICE_MODEL);
+        isKindleTablet = isAmazonDevice && DEVICEMODEL.startsWith(KINDLE_TABLET_DEVICE_MODEL);
+        isFirePhone = isAmazonDevice && DEVICEMODEL.startsWith(FIRE_PHONE_DEVICE_MODEL);
     }
 
     private AmazonQuirks(){}
@@ -79,5 +86,17 @@ public final class AmazonQuirks {
 
         Log.i(TAG, "Using default Dolby pass-through decoder");
         return true;
+    }
+
+    public static boolean isLatencyQuirkEnabled() {
+        // Sets latency quirk for Amazon KK and JB Tablets and Fire Phone
+        return (Util.SDK_INT <= 19) && (isKindleTablet || isFirePhone);
+    }
+
+    public static int getAudioHWLatency() {
+        // this function is called only when the above function
+        // returns true for latency quirk. So no need to check for
+        // SDK version and device type again
+        return AUDIO_HARDWARE_LATENCY_FOR_TABLETS;
     }
 }
