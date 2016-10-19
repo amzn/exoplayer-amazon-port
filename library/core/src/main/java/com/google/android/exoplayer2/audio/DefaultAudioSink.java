@@ -339,6 +339,7 @@ public final class DefaultAudioSink implements AudioSink {
   private boolean offloadDisabledUntilNextConfiguration;
   private boolean isWaitingForOffloadEndOfStreamHandled;
   // AMZN_CHANGE_BEGIN
+  private static final boolean isLatencyQuirkEnabled = AmazonQuirks.isLatencyQuirkEnabled();
   private static final boolean isLegacyPassthroughQuirkEnabled = AmazonQuirks.isDolbyPassthroughQuirkEnabled();
   // AMZN_CHANGE_END
 
@@ -413,7 +414,8 @@ public final class DefaultAudioSink implements AudioSink {
     this.enableAudioTrackPlaybackParams = Util.SDK_INT >= 23 && enableAudioTrackPlaybackParams;
     this.enableOffload = Util.SDK_INT >= 29 && enableOffload;
     releasingConditionVariable = new ConditionVariable(true);
-    audioTrackPositionTracker = new AudioTrackPositionTracker(new PositionTrackerListener());
+    audioTrackPositionTracker = new AudioTrackPositionTracker(new PositionTrackerListener(),
+                                      isLatencyQuirkEnabled); // AMZN_CHANGE_ONELINE
     channelMappingAudioProcessor = new ChannelMappingAudioProcessor();
     trimmingAudioProcessor = new TrimmingAudioProcessor();
     ArrayList<AudioProcessor> toIntPcmAudioProcessors = new ArrayList<>();
@@ -425,6 +427,13 @@ public final class DefaultAudioSink implements AudioSink {
     Collections.addAll(toIntPcmAudioProcessors, audioProcessorChain.getAudioProcessors());
     toIntPcmAvailableAudioProcessors = toIntPcmAudioProcessors.toArray(new AudioProcessor[0]);
     toFloatPcmAvailableAudioProcessors = new AudioProcessor[] {new FloatResamplingAudioProcessor()};
+
+    // AMZN_CHANGE_BEGIN
+    Log.i(TAG,"Amazon quirks:"
+            + " Latency:" + (isLatencyQuirkEnabled ? "on" : "off")
+            + "; Dolby" + (isLegacyPassthroughQuirkEnabled ? "on" : "off")
+            + ". On Sdk: " + Util.SDK_INT);
+    // AMZN_CHANGE_END
     volume = 1f;
     audioAttributes = AudioAttributes.DEFAULT;
     audioSessionId = C.AUDIO_SESSION_ID_UNSET;
