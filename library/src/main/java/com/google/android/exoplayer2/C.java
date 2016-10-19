@@ -62,6 +62,12 @@ public final class C {
   public static final int LENGTH_UNSET = -1;
 
   /**
+   * The number of milliseconds in one second.
+   */
+  public static final long MILLIS_PER_SECOND = 1000L;
+
+
+  /**
    * The number of microseconds in one second.
    */
   public static final long MICROS_PER_SECOND = 1000000L;
