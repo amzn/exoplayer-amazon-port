@@ -286,6 +286,7 @@ public final class DefaultAudioSink implements AudioSink {
   private boolean tunneling;
   private long lastFeedElapsedRealtimeMs;
   // AMZN_CHANGE_BEGIN
+  private static final boolean isLatencyQuirkEnabled = AmazonQuirks.isLatencyQuirkEnabled();
   private final boolean isLegacyPassthroughQuirckEnabled = AmazonQuirks.isDolbyPassthroughQuirkEnabled();
   // AMZN_CHANGE_END
 
@@ -345,7 +346,8 @@ public final class DefaultAudioSink implements AudioSink {
     this.audioProcessorChain = Assertions.checkNotNull(audioProcessorChain);
     this.enableConvertHighResIntPcmToFloat = enableConvertHighResIntPcmToFloat;
     releasingConditionVariable = new ConditionVariable(true);
-    audioTrackPositionTracker = new AudioTrackPositionTracker(new PositionTrackerListener());
+    audioTrackPositionTracker = new AudioTrackPositionTracker(new PositionTrackerListener(),
+                                      isLatencyQuirkEnabled); // AMZN_CHANGE_ONELINE
     channelMappingAudioProcessor = new ChannelMappingAudioProcessor();
     trimmingAudioProcessor = new TrimmingAudioProcessor();
     ArrayList<AudioProcessor> toIntPcmAudioProcessors = new ArrayList<>();
@@ -358,6 +360,12 @@ public final class DefaultAudioSink implements AudioSink {
     toIntPcmAvailableAudioProcessors =
         toIntPcmAudioProcessors.toArray(new AudioProcessor[toIntPcmAudioProcessors.size()]);
     toFloatPcmAvailableAudioProcessors = new AudioProcessor[] {new FloatResamplingAudioProcessor()};
+    // AMZN_CHANGE_BEGIN
+    Log.i(TAG,"Amazon quirks:"
+            + " Latency:" + (isLatencyQuirkEnabled ? "on" : "off")
+            + "; Dolby" + (isLegacyPassthroughQuirckEnabled ? "on" : "off")
+            + ". On Sdk: " + Util.SDK_INT);
+    // AMZN_CHANGE_END
     volume = 1.0f;
     startMediaTimeState = START_NOT_SET;
     audioAttributes = AudioAttributes.DEFAULT;
@@ -1094,6 +1102,7 @@ public final class DefaultAudioSink implements AudioSink {
             positionUs - playbackParametersPositionUs, playbackParameters.speed);
   }
 
+
   private long applySkipping(long positionUs) {
     return positionUs + framesToDurationUs(audioProcessorChain.getSkippedOutputFrameCount());
   }
@@ -1367,7 +1376,6 @@ public final class DefaultAudioSink implements AudioSink {
       this.mediaTimeUs = mediaTimeUs;
       this.positionUs = positionUs;
     }
-
   }
 
   private final class PositionTrackerListener implements AudioTrackPositionTracker.Listener {
