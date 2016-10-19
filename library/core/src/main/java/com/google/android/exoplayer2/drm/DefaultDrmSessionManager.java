@@ -35,6 +35,7 @@ import com.google.android.exoplayer2.drm.ExoMediaDrm.KeyRequest;
 import com.google.android.exoplayer2.drm.ExoMediaDrm.OnEventListener;
 import com.google.android.exoplayer2.drm.ExoMediaDrm.ProvisionRequest;
 import com.google.android.exoplayer2.extractor.mp4.PsshAtomUtil;
+import com.google.android.exoplayer2.util.AmazonQuirks;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
@@ -352,9 +353,20 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
       }
       schemeInitData = schemeData.data;
       schemeMimeType = schemeData.mimeType;
-      if (Util.SDK_INT < 21) {
+      //AMZN_CHANGE_BEGIN
+      boolean extractSchemeSpecificData = false;
+      if (Util.SDK_INT < 21 && uuid.equals(C.WIDEVINE_UUID)) {
         // Prior to L the Widevine CDM required data to be extracted from the PSSH atom.
-        byte[] psshData = PsshAtomUtil.parseSchemeSpecificData(schemeInitData, C.WIDEVINE_UUID);
+        extractSchemeSpecificData = true;
+      }
+      if (AmazonQuirks.shouldExtractPlayReadyHeader() && uuid.equals(C.PLAYREADY_UUID)) {
+        // PlayReady support on Amazon Fire TV devices require the PlayReady
+        // header to be extracted from the PSSH
+        extractSchemeSpecificData = true;
+      }
+      if (extractSchemeSpecificData) {
+        // Prior to L the Widevine CDM required data to be extracted from the PSSH atom.
+        byte[] psshData = PsshAtomUtil.parseSchemeSpecificData(schemeInitData, uuid);
         if (psshData == null) {
           // Extraction failed. schemeData isn't a Widevine PSSH atom, so leave it unchanged.
         } else {
@@ -368,6 +380,7 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
         schemeMimeType = CENC_SCHEME_MIME_TYPE;
       }
     }
+    //AMZN_CHANGE_END
     state = STATE_OPENING;
     openInternal(true);
     return this;
