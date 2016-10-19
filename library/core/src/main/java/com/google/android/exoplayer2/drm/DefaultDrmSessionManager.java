@@ -31,6 +31,7 @@ import com.google.android.exoplayer2.drm.DrmInitData.SchemeData;
 import com.google.android.exoplayer2.drm.DrmSession.DrmSessionException;
 import com.google.android.exoplayer2.drm.ExoMediaDrm.OnEventListener;
 import com.google.android.exoplayer2.extractor.mp4.PsshAtomUtil;
+import com.google.android.exoplayer2.util.AmazonQuirks;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
@@ -652,7 +653,10 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
 
   private static byte[] getSchemeInitData(SchemeData data, UUID uuid) {
     byte[] schemeInitData = data.data;
-    if (Util.SDK_INT < 21) {
+    // AMZN_CHANGE_BEGIN
+    if ((Util.SDK_INT < 21 && uuid.equals(C.WIDEVINE_UUID)) ||
+        (AmazonQuirks.shouldExtractPlayReadyHeader() && uuid.equals(C.PLAYREADY_UUID))) {
+    // AMZN_CHANGE_END
       // Prior to L the Widevine CDM required data to be extracted from the PSSH atom.
       byte[] psshData = PsshAtomUtil.parseSchemeSpecificData(schemeInitData, uuid);
       if (psshData == null) {
