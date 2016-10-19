@@ -96,4 +96,8 @@ public final class AmazonQuirks {
         // SDK version and device type again
         return AUDIO_HARDWARE_LATENCY_FOR_TABLETS;
     }
+
+    public static boolean shouldExtractPlayReadyHeader() {
+        return isFireTVGen1Family() || isFireTVGen2();
+    }
 }
