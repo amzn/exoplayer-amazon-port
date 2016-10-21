@@ -39,6 +39,7 @@ import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
 import com.google.android.exoplayer2.mediacodec.MediaCodecUtil.DecoderQueryException;
 import com.google.android.exoplayer2.source.MediaPeriod;
+import com.google.android.exoplayer2.util.AmazonQuirks;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.NalUnitUtil;
 import com.google.android.exoplayer2.util.TraceUtil;
@@ -318,6 +319,12 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
           throw ExoPlaybackException.createForRenderer(drmError, getIndex());
         }
         // The drm session isn't open yet.
+        return;
+      }
+      if (AmazonQuirks.waitForDRMKeysBeforeInitCodec() &&
+              drmSession.getState() != DrmSession.STATE_OPENED_WITH_KEYS) {
+        // we expect the DRM session to be opened with keys before initializing
+        // decoder on this device
         return;
       }
       wrappedMediaCrypto = mediaCrypto.getWrappedMediaCrypto();
