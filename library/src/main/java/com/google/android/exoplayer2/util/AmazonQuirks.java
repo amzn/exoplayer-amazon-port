@@ -100,4 +100,15 @@ public final class AmazonQuirks {
     public static boolean shouldExtractPlayReadyHeader() {
         return isFireTVGen1Family() || isFireTVGen2();
     }
+
+    /* In Fire TV Gen1 family of devices, there is a platform limitation that
+    * codec cannot be initialized with a crypto object before the DRM keys are
+    * provided to MediaDRM - the media codec either skips processing or
+    * throws error on processing the CSD provided in clear as part of the
+    * media format object passed in configure API.
+    * Hence, we wait for the DRM keys to be acquired before initializing the codec.
+    */
+    public static boolean waitForDRMKeysBeforeInitCodec() {
+        return isFireTVGen1Family();
+    }
 }
