@@ -1175,7 +1175,8 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
    *     propagation incorrectly on the host device. False otherwise.
    */
   private static boolean codecNeedsEosPropagationWorkaround(String name) {
-    return Util.SDK_INT <= 17 && ("OMX.rk.video_decoder.avc".equals(name)
+    return AmazonQuirks.codecNeedsEosPropagationWorkaround(name)
+        || Util.SDK_INT <= 17 && ("OMX.rk.video_decoder.avc".equals(name)
         || "OMX.allwinner.video.decoder.avc".equals(name));
   }
 
