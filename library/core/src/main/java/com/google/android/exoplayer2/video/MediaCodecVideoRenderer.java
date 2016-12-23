@@ -442,7 +442,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
       MediaCrypto crypto) throws DecoderQueryException {
     codecMaxValues = getCodecMaxValues(codecInfo, format, getStreamFormats());
     MediaFormat mediaFormat = getMediaFormat(format, codecMaxValues, deviceNeedsAutoFrcWorkaround,
-        tunnelingAudioSessionId);
+        tunnelingAudioSessionId, codecName); // AMZN_CHANGE_ONELINE
     if (surface == null) {
       Assertions.checkState(shouldUseDummySurface(codecInfo));
       if (dummySurface == null) {
@@ -974,7 +974,8 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
       Format format,
       CodecMaxValues codecMaxValues,
       boolean deviceNeedsAutoFrcWorkaround,
-      int tunnelingAudioSessionId) {
+      int tunnelingAudioSessionId,
+      String codecName) { //AMZN_CHANGE_ONELINE
     MediaFormat mediaFormat = new MediaFormat();
     // Set format parameters that should always be set.
     mediaFormat.setString(MediaFormat.KEY_MIME, format.sampleMimeType);
@@ -988,8 +989,15 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
     // Set codec max values.
     mediaFormat.setInteger(MediaFormat.KEY_MAX_WIDTH, codecMaxValues.width);
     mediaFormat.setInteger(MediaFormat.KEY_MAX_HEIGHT, codecMaxValues.height);
-    MediaFormatUtil.maybeSetInteger(
-        mediaFormat, MediaFormat.KEY_MAX_INPUT_SIZE, codecMaxValues.inputSize);
+
+    // AMZN_CHANGE_BEGIN
+    // Set the maximum input size.
+    if (codecMaxValues.inputSize != Format.NO_VALUE &&
+            AmazonQuirks.isMaxInputSizeSupported(codecName, codecMaxValues.inputSize)) {
+      MediaFormatUtil.maybeSetInteger(mediaFormat, MediaFormat.KEY_MAX_INPUT_SIZE, codecMaxValues.inputSize);
+    }
+    // AMZN_CHANGE_END
+
     // Set codec configuration values.
     if (Util.SDK_INT >= 23) {
       mediaFormat.setInteger(MediaFormat.KEY_PRIORITY, 0 /* realtime priority */);
