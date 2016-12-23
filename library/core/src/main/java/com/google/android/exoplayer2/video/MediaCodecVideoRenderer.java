@@ -421,7 +421,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
       MediaCrypto crypto) throws DecoderQueryException {
     codecMaxValues = getCodecMaxValues(codecInfo, format, streamFormats);
     MediaFormat mediaFormat = getMediaFormat(format, codecMaxValues, deviceNeedsAutoFrcWorkaround,
-        tunnelingAudioSessionId);
+        codecName, tunnelingAudioSessionId);
     if (surface == null) {
       Assertions.checkState(shouldUseDummySurface(codecInfo));
       if (dummySurface == null) {
@@ -974,13 +974,21 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
    */
   @SuppressLint("InlinedApi")
   protected MediaFormat getMediaFormat(Format format, CodecMaxValues codecMaxValues,
-      boolean deviceNeedsAutoFrcWorkaround, int tunnelingAudioSessionId) {
+      boolean deviceNeedsAutoFrcWorkaround, String codecName, //AMZN_CHANGE_ONELINE
+      int tunnelingAudioSessionId) {
     MediaFormat frameworkMediaFormat = getMediaFormatForPlayback(format);
+    // Set the maximum adaptive video dimensions.
     frameworkMediaFormat.setInteger(MediaFormat.KEY_MAX_WIDTH, codecMaxValues.width);
     frameworkMediaFormat.setInteger(MediaFormat.KEY_MAX_HEIGHT, codecMaxValues.height);
-    if (codecMaxValues.inputSize != Format.NO_VALUE) {
+
+    // AMZN_CHANGE_BEGIN
+    // Set the maximum input size.
+    if (codecMaxValues.inputSize != Format.NO_VALUE &&
+            AmazonQuirks.isMaxInputSizeSupported(codecName, codecMaxValues.inputSize)) {
       frameworkMediaFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, codecMaxValues.inputSize);
     }
+    // AMZN_CHANGE_END
+    // Set FRC workaround.
     if (deviceNeedsAutoFrcWorkaround) {
       frameworkMediaFormat.setInteger("auto-frc", 0);
     }
