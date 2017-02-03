@@ -674,49 +674,36 @@ public final class AudioTrack {
       bufferBytesRemaining = size;
       buffer.position(offset);
 
-
-      //AMZN_CHANGE_BEGIN
-      // for dolby passthrough quirk case we don't want to validate start times
-      // because its not possible to validate it based on submitted bytes
-      if (applyDolbyPassthroughQuirk()) {
-        if (startMediaTimeState == START_NOT_SET) {
-          startMediaTimeUs = presentationTimeUs;
-          log.i("Setting StartMediaTimeUs = " + startMediaTimeUs);
-          startMediaTimeState = START_IN_SYNC;
-        }
+      if (passthrough && framesPerEncodedSample == 0) {
+        // If this is the first encoded sample, calculate the sample size in frames.
+        framesPerEncodedSample = getFramesPerEncodedSample(encoding, buffer);
+      }
+      long frames = passthrough ? framesPerEncodedSample : pcmBytesToFrames(size);
+      long bufferDurationUs = framesToDurationUs(frames);
+      // Note: presentationTimeUs corresponds to the end of the sample, not the start.
+      long bufferStartTime = presentationTimeUs - bufferDurationUs;
+      if (startMediaTimeState == START_NOT_SET) {
+        startMediaTimeUs = Math.max(0, bufferStartTime);
+        log.i("Setting StartMediaTimeUs = " + startMediaTimeUs);
+        startMediaTimeState = START_IN_SYNC;
       } else {
-        if (passthrough && framesPerEncodedSample == 0) {
-          // If this is the first encoded sample, calculate the sample size in frames.
-          framesPerEncodedSample = getFramesPerEncodedSample(encoding, buffer);
+        // Sanity check that bufferStartTime is consistent with the expected value.
+        long expectedBufferStartTime = startMediaTimeUs + framesToDurationUs(getSubmittedFrames());
+        if (startMediaTimeState == START_IN_SYNC
+            && Math.abs(expectedBufferStartTime - bufferStartTime) > 200000) {
+          log.w("Discontinuity detected [expected " + expectedBufferStartTime + ", got "
+              + bufferStartTime + "]");
+          startMediaTimeState = START_NEED_SYNC;
         }
-        long frames = passthrough ? framesPerEncodedSample : pcmBytesToFrames(size);
-        long bufferDurationUs = framesToDurationUs(frames);
-        // Note: presentationTimeUs corresponds to the end of the sample, not the start.
-        long bufferStartTime = presentationTimeUs - bufferDurationUs;
-        if (startMediaTimeState == START_NOT_SET) {
-          startMediaTimeUs = Math.max(0, bufferStartTime);
-          log.i("Setting StartMediaTimeUs = " + startMediaTimeUs);
+        if (startMediaTimeState == START_NEED_SYNC) {
+          // Adjust startMediaTimeUs to be consistent with the current buffer's start time and the
+          // number of bytes submitted.
+          startMediaTimeUs += (bufferStartTime - expectedBufferStartTime);
+          log.i("StartMediaTimeUs recalculated as = " + startMediaTimeUs);
           startMediaTimeState = START_IN_SYNC;
-        } else {
-          // Sanity check that bufferStartTime is consistent with the expected value.
-          long expectedBufferStartTime = startMediaTimeUs + framesToDurationUs(getSubmittedFrames());
-          if (startMediaTimeState == START_IN_SYNC
-              && Math.abs(expectedBufferStartTime - bufferStartTime) > 200000) {
-            log.w("Discontinuity detected [expected " + expectedBufferStartTime + ", got "
-                + bufferStartTime + "]");
-            startMediaTimeState = START_NEED_SYNC;
-          }
-          if (startMediaTimeState == START_NEED_SYNC) {
-            // Adjust startMediaTimeUs to be consistent with the current buffer's start time and the
-            // number of bytes submitted.
-            startMediaTimeUs += (bufferStartTime - expectedBufferStartTime);
-            log.i("StartMediaTimeUs recalculated as = " + startMediaTimeUs);
-            startMediaTimeState = START_IN_SYNC;
-            result |= RESULT_POSITION_DISCONTINUITY;
-          }
+          result |= RESULT_POSITION_DISCONTINUITY;
         }
       }
-      // AMZN_CHANGE_END
       // we need to copy data to temp buffer in case of dolby passthrough also
       // irrespective of SDK version.
       if (Util.SDK_INT < 21 || applyDolbyPassthroughQuirk()) { // AMZN_CHANGE_ONELINE
@@ -767,7 +754,7 @@ public final class AudioTrack {
       submittedPcmBytes += bytesWritten;
     }
     if (bufferBytesRemaining == 0) {
-      if (passthrough && !applyDolbyPassthroughQuirk()) { // AMZN_CHANGE_ONELINE
+      if (passthrough) {
         submittedEncodedFrames += framesPerEncodedSample;
       }
       result |= RESULT_BUFFER_CONSUMED;
