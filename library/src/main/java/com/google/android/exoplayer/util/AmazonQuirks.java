@@ -27,6 +27,7 @@ public final class AmazonQuirks {
   private static final String FIRETV_STICK_DEVICE_MODEL = "AFTM";
   private static final String FIRETV_GEN2_DEVICE_MODEL = "AFTS";
   private static final String KINDLE_TABLET_DEVICE_MODEL = "KF";
+  private static final String FIRE_PHONE_DEVICE_MODEL = "SD";
   private static final String AMAZON = "Amazon";
   private static final String DEVICEMODEL = Build.MODEL;
   private static final String MANUFACTURER = Build.MANUFACTURER;
@@ -39,6 +40,7 @@ public final class AmazonQuirks {
   private static final boolean isFireTVStick;
   private static final boolean isFireTVGen2;
   private static final boolean isKindleTablet;
+  private static final boolean isFirePhone;
   private static final long fireTVFireOsBuildVersion;
 
   static {// This static block must be at the end
@@ -48,6 +50,7 @@ public final class AmazonQuirks {
     isFireTVStick = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_STICK_DEVICE_MODEL);
     isFireTVGen2 = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN2_DEVICE_MODEL);
     isKindleTablet = isAmazonDevice && DEVICEMODEL.startsWith(KINDLE_TABLET_DEVICE_MODEL);
+    isFirePhone = isAmazonDevice && DEVICEMODEL.startsWith(FIRE_PHONE_DEVICE_MODEL);
     fireTVFireOsBuildVersion = getBuildVersion();
   }
 
@@ -65,8 +68,8 @@ public final class AmazonQuirks {
   }
 
   public static boolean isLatencyQuirkEnabled() {
-    // Sets latency quirk for Amazon KK and JB Tablets
-    return ( (Util.SDK_INT <= 19) && isKindleTablet );
+    // Sets latency quirk for Amazon KK and JB Tablets and Phone
+    return ( (Util.SDK_INT <= 19) && (isKindleTablet || isFirePhone) );
   }
 
   public static int getAudioHWLatency() {
