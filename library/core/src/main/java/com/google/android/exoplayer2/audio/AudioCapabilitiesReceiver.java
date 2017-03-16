@@ -15,13 +15,18 @@
  */
 package com.google.android.exoplayer2.audio;
 
+import android.annotation.TargetApi;
 import android.content.BroadcastReceiver;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.database.ContentObserver;
 import android.media.AudioManager;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Util;
+import android.net.Uri;
+import android.provider.Settings;
 
 /**
  * Receives broadcast events indicating changes to the device's audio capabilities, notifying a
@@ -46,7 +51,11 @@ public final class AudioCapabilitiesReceiver {
   private final Context context;
   private final Listener listener;
   private final BroadcastReceiver receiver;
-
+  // AMZN_CHANGE_BEGIN
+  private final ContentResolver resolver;
+  private final SurroundSoundSettingObserver observer;
+  private AudioCapabilities currentHDMIAudioCapabilities;
+  // AMZN_CHANGE_END
   /* package */ AudioCapabilities audioCapabilities;
 
   /**
@@ -57,6 +66,15 @@ public final class AudioCapabilitiesReceiver {
     this.context = Assertions.checkNotNull(context);
     this.listener = Assertions.checkNotNull(listener);
     this.receiver = Util.SDK_INT >= 21 ? new HdmiAudioPlugBroadcastReceiver() : null;
+    // AMZN_CHANGE_BEGIN
+    if (Util.SDK_INT >= 17) {
+      this.resolver = context.getContentResolver();
+      this.observer = new SurroundSoundSettingObserver();
+    } else {
+      this.resolver = null;
+      this.observer = null;
+    }
+    // AMZN_CHANGE_END
   }
 
   /**
@@ -70,7 +88,15 @@ public final class AudioCapabilitiesReceiver {
   public AudioCapabilities register() {
     Intent stickyIntent = receiver == null ? null
         : context.registerReceiver(receiver, new IntentFilter(AudioManager.ACTION_HDMI_AUDIO_PLUG));
-    audioCapabilities = AudioCapabilities.getCapabilities(stickyIntent);
+    // AMZN_CHANGE_BEGIN
+    currentHDMIAudioCapabilities = audioCapabilities =
+            AudioCapabilities.getCapabilities(context, stickyIntent);
+    if (resolver != null && observer != null) {
+      Uri surroundSoundUri =
+              Settings.Global.getUriFor(AudioCapabilities.EXTERNAL_SURROUND_SOUND_ENABLED);
+      resolver.registerContentObserver(surroundSoundUri, true, observer);
+    }
+    // AMZN_CHANGE_END
     return audioCapabilities;
   }
 
@@ -82,21 +108,64 @@ public final class AudioCapabilitiesReceiver {
     if (receiver != null) {
       context.unregisterReceiver(receiver);
     }
+    // AMZN_CHANGE_BEGIN
+    if (resolver != null  && observer != null) {
+      resolver.unregisterContentObserver(observer);
+    }
+    // AMZN_CHANGE_END
   }
+
+  // AMZN_CHANGE_BEGIN
+  private void maybeNotifyAudioCapabilityChanged(AudioCapabilities newAudioCapabilities) {
+    if (!newAudioCapabilities.equals(audioCapabilities)) {
+      audioCapabilities = newAudioCapabilities;
+      listener.onAudioCapabilitiesChanged(newAudioCapabilities);
+    }
+  }
+  // AMZN_CHANGE_END
 
   private final class HdmiAudioPlugBroadcastReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
       if (!isInitialStickyBroadcast()) {
-        AudioCapabilities newAudioCapabilities = AudioCapabilities.getCapabilities(intent);
-        if (!newAudioCapabilities.equals(audioCapabilities)) {
-          audioCapabilities = newAudioCapabilities;
-          listener.onAudioCapabilitiesChanged(newAudioCapabilities);
-        }
+        // AMZN_CHANGE_BEGIN
+        currentHDMIAudioCapabilities = AudioCapabilities.getCapabilities(context, intent);
+        // no need to check whether HDMI audio capabilities needs to be overridden or not,
+        // because AudioCapabilities.getCapabilities takes care of it. internally
+        maybeNotifyAudioCapabilityChanged(currentHDMIAudioCapabilities);
+        // AMZN_CHANGE_END
       }
     }
 
   }
+  // AMZN_CHANGE_BEGIN
+  @TargetApi(17)
+  private final class SurroundSoundSettingObserver extends ContentObserver {
+    public SurroundSoundSettingObserver() {
+      super(null);
+    }
+
+    @Override
+    public boolean deliverSelfNotifications() {
+      return true;
+    }
+
+    @Override
+    public void onChange(boolean selfChange) {
+      super.onChange(selfChange);
+      AudioCapabilities newAudioCapabilities;
+      if (AudioCapabilities.isSurroundSoundEnabledV17(resolver)) {
+        // override HDMI capabilities and enable Surround Sound audio capability
+        newAudioCapabilities = AudioCapabilities.SURROUND_AUDIO_CAPABILITIES;
+      } else {
+        // fallback to last known HDMI audioCapabilities,
+        // hopefully updated by HDMI plugged state intent
+        newAudioCapabilities = currentHDMIAudioCapabilities;
+      }
+      maybeNotifyAudioCapabilityChanged(newAudioCapabilities);
+    }
+  }
+  // AMZN_CHANGE_END
 
 }
