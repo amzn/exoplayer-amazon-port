@@ -17,11 +17,16 @@ package com.google.android.exoplayer2.audio;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.AudioFormat;
 import android.media.AudioManager;
+import android.provider.Settings;
+
+import com.google.android.exoplayer2.util.Util;
+
 import java.util.Arrays;
 
 /**
@@ -36,6 +41,17 @@ public final class AudioCapabilities {
   public static final AudioCapabilities DEFAULT_AUDIO_CAPABILITIES =
       new AudioCapabilities(new int[] {AudioFormat.ENCODING_PCM_16BIT}, 2);
 
+  // AMZN_CHANGE_BEGIN
+   /** For Optical output, we read this global setting to detect if dolby output is enabled by
+     * the user. If not, we fallback on the HDMI audio intent.
+     */
+  public static final String EXTERNAL_SURROUND_SOUND_ENABLED = "external_surround_sound_enabled";
+  public static final AudioCapabilities SURROUND_AUDIO_CAPABILITIES =
+  new AudioCapabilities(new int[] {AudioFormat.ENCODING_PCM_16BIT,
+    AudioFormat.ENCODING_AC3,
+    AudioFormat.ENCODING_E_AC3 },
+          6);// TODO: 6 or 8 ? Currently not used by Exo in taking decisions
+  // AMZN_CHANGE_END
   /**
    * Returns the current audio capabilities for the device.
    *
@@ -44,12 +60,17 @@ public final class AudioCapabilities {
    */
   @SuppressWarnings("InlinedApi")
   public static AudioCapabilities getCapabilities(Context context) {
-    return getCapabilities(
+    return getCapabilities(context, // AMZN_CHANGE_ONELINE
         context.registerReceiver(null, new IntentFilter(AudioManager.ACTION_HDMI_AUDIO_PLUG)));
   }
 
   @SuppressLint("InlinedApi")
-  /* package */ static AudioCapabilities getCapabilities(Intent intent) {
+  /* package */ static AudioCapabilities getCapabilities(Context context, Intent intent) {
+    // AMZN_CHANGE_BEGIN
+    if (Util.SDK_INT >= 17 && isSurroundSoundEnabledV17(context.getContentResolver())) {
+      return SURROUND_AUDIO_CAPABILITIES;
+    }
+    // AMZN_CHANGE_END
     if (intent == null || intent.getIntExtra(AudioManager.EXTRA_AUDIO_PLUG_STATE, 0) == 0) {
       return DEFAULT_AUDIO_CAPABILITIES;
     }
@@ -57,6 +78,12 @@ public final class AudioCapabilities {
         intent.getIntExtra(AudioManager.EXTRA_MAX_CHANNEL_COUNT, 0));
   }
 
+  // AMZN_CHANGE_BEGIN
+  @TargetApi(17)
+  public static boolean isSurroundSoundEnabledV17(ContentResolver resolver) {
+    return Settings.Global.getInt(resolver, EXTERNAL_SURROUND_SOUND_ENABLED, 0) == 1;
+  }
+  // AMZN_CHANGE_END
   private final int[] supportedEncodings;
   private final int maxChannelCount;
 
