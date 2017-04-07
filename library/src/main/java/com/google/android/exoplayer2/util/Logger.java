@@ -32,7 +32,7 @@ public class Logger {
          */
         AudioVideoCommon,
         /**
-         *  Module that includes MediaCodecAudioTrackRenderer & AudioTrack
+         *  Module that includes MediaCodecAudioTrackRenderer &amp; AudioTrack
          */
         Audio,
         /**
@@ -40,7 +40,7 @@ public class Logger {
          */
         Video,
         /**
-         *  Module that includes MOD_VIDEO, MOD_AUDIO & MOD_AUDIO_VIDEO_COMMON
+         *  Module that includes MOD_VIDEO, MOD_AUDIO &amp; MOD_AUDIO_VIDEO_COMMON
          */
         AudioVideo,
 
@@ -83,7 +83,7 @@ public class Logger {
      *   Setting AudioVideo enables logging in both Audio and Video
      *   Setting Audio or Video enables logging in AudioVideoCommon
      * @param logLevel Log level for this module. One of the constants in
-     *    android.util.Log. i.e Log.ERROR, Log.WARNING, Log.INFO, Log.DEBUG & Log.VERBOSE
+     *    android.util.Log. i.e Log.ERROR, Log.WARNING, Log.INFO, Log.DEBUG &amp; Log.VERBOSE
      *    Info , error and warning logs are always printed.
      *    Setting to Log.INFO, Log.ERROR, Log.WARNING etc disables DEBUG and VERBOSE logs.
      *    Setting to Log.VERBOSE prints Debug and Verbose logs.

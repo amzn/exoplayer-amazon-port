@@ -277,17 +277,17 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
    * Sets the mode, which determines the role of sessions acquired from the instance. This must be
    * called before {@link #acquireSession(Looper, DrmInitData)} is called.
    *
-   * <p>By default, the mode is {@link #MODE_PLAYBACK} and a streaming license is requested when
+   * .By default, the mode is {@link #MODE_PLAYBACK} and a streaming license is requested when
    * required.
    *
-   * <p>{@code mode} must be one of these:
-   * <li>{@link #MODE_PLAYBACK}: If {@code offlineLicenseKeySetId} is null, a streaming license is
+   * .{@code mode} must be one of these:
+   * .{@link #MODE_PLAYBACK}: If {@code offlineLicenseKeySetId} is null, a streaming license is
    *     requested otherwise the offline license is restored.
-   * <li>{@link #MODE_QUERY}: {@code offlineLicenseKeySetId} can not be null. The offline license
+   * .{@link #MODE_QUERY}: {@code offlineLicenseKeySetId} can not be null. The offline license
    *     is restored.
-   * <li>{@link #MODE_DOWNLOAD}: If {@code offlineLicenseKeySetId} is null, an offline license is
+   * .{@link #MODE_DOWNLOAD}: If {@code offlineLicenseKeySetId} is null, an offline license is
    *     requested otherwise the offline license is renewed.
-   * <li>{@link #MODE_RELEASE}: {@code offlineLicenseKeySetId} can not be null. The offline license
+   * .{@link #MODE_RELEASE}: {@code offlineLicenseKeySetId} can not be null. The offline license
    *     is released.
    *
    * @param mode The mode to be set.
