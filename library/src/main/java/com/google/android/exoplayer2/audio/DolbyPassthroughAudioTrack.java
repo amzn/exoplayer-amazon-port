@@ -148,7 +148,7 @@ public final class DolbyPassthroughAudioTrack extends android.media.AudioTrack {
   /**
    * Play will block until previous messages to handler Thread
    * are executed.
-   * We need to serialize play, write, pause & release because otherwise,
+   * We need to serialize play, write, pause &amp; release because otherwise,
    * base audio track  will misbehave.
    */
   @Override
@@ -273,7 +273,7 @@ public final class DolbyPassthroughAudioTrack extends android.media.AudioTrack {
   /**
    * Release will block until previous messages to handler Thread
    * are executed.
-   * We need to serialize play, write, pause & release because otherwise,
+   * We need to serialize play, write, pause &amp; release because otherwise,
    * base audio track  will misbehave.
    */
   @Override
