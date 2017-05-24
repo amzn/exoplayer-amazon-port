@@ -17,12 +17,16 @@ package com.google.android.exoplayer2.audio;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.provider.Settings;
+
+import com.google.android.exoplayer2.util.Util;
+
 import java.util.Arrays;
 
 /**
@@ -63,11 +67,10 @@ public final class AudioCapabilities {
   @SuppressLint("InlinedApi")
   /* package */ static AudioCapabilities getCapabilities(Context context, Intent intent) {
     // AMZN_CHANGE_BEGIN
-    int isSurroundSoundEnabled = Settings.Global.getInt(context.getContentResolver(),
-            EXTERNAL_SURROUND_SOUND_ENABLED, 0);
-    if (isSurroundSoundEnabled == 1) {
+    if (Util.SDK_INT >= 17 && isSurroundSoundEnabledV17(context.getContentResolver())) {
       return SURROUND_AUDIO_CAPABILITIES;
     }
+
     // AMZN_CHANGE_END
     if (intent == null || intent.getIntExtra(AudioManager.EXTRA_AUDIO_PLUG_STATE, 0) == 0) {
       return DEFAULT_AUDIO_CAPABILITIES;
@@ -75,6 +78,13 @@ public final class AudioCapabilities {
     return new AudioCapabilities(intent.getIntArrayExtra(AudioManager.EXTRA_ENCODINGS),
         intent.getIntExtra(AudioManager.EXTRA_MAX_CHANNEL_COUNT, 0));
   }
+
+  // AMZN_CHANGE_BEGIN
+  @TargetApi(17)
+  public static boolean isSurroundSoundEnabledV17(ContentResolver resolver) {
+    return Settings.Global.getInt(resolver, EXTERNAL_SURROUND_SOUND_ENABLED, 0) == 1;
+  }
+  // AMZN_CHANGE_END
 
   private final int[] supportedEncodings;
   private final int maxChannelCount;
