@@ -30,6 +30,7 @@ public final class AmazonQuirks {
     private static final String KINDLE_TABLET_DEVICE_MODEL     = "KF";
     private static final String FIRE_PHONE_DEVICE_MODEL        = "SD";
     private static final String AMAZON                         = "Amazon";
+    private static final String SOHO_DEVICE_MODEL              = "KFSOWI";
 
     private static final String DEVICEMODEL  = Build.MODEL;
     private static final String MANUFACTURER = Build.MANUFACTURER;
@@ -46,6 +47,7 @@ public final class AmazonQuirks {
     private static final boolean isFireTVGen2;
     private static final boolean isKindleTablet;
     private static final boolean isFirePhone;
+    private static final boolean isSOHOKindleTablet;
 
     // This static block must be the last
     //INIT ORDERING IS IMPORTANT IN THIS BLOCK!
@@ -56,6 +58,7 @@ public final class AmazonQuirks {
         isFireTVStick  = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_STICK_DEVICE_MODEL);
         isKindleTablet = isAmazonDevice && DEVICEMODEL.startsWith(KINDLE_TABLET_DEVICE_MODEL);
         isFirePhone = isAmazonDevice && DEVICEMODEL.startsWith(FIRE_PHONE_DEVICE_MODEL);
+        isSOHOKindleTablet = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(SOHO_DEVICE_MODEL);
     }
 
     private AmazonQuirks(){}
@@ -173,7 +176,12 @@ public final class AmazonQuirks {
        if (isFireTVGen2) {
            isSizeSupported = TextUtils.isEmpty(codecName) || !codecName.endsWith("AVC.secure") ||
                inputSize <= MAX_INPUT_SECURE_AVC_SIZE_FIRETV_GEN2;
-       }
+       } else if(isSOHOKindleTablet) {
+            // Avoid changing default input buffer size for video decoder because otherwise,
+            // it crashes. We don't know the max limit of this legacy platform.
+            isSizeSupported = TextUtils.isEmpty(codecName)
+                    || !codecName.equalsIgnoreCase("OMX.TI.DUCATI1.VIDEO.DECODER");
+        }
        return isSizeSupported;
     }
 
