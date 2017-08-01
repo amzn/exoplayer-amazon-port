@@ -17,7 +17,7 @@ buildscript {
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:2.3.1'
-        classpath 'com.novoda:bintray-release:0.4.0'
+        classpath 'com.github.dcendents:android-maven-gradle-plugin:1.5'
     }
     // Workaround for the following test coverage issue. Remove when fixed:
     // https://code.google.com/p/android/issues/detail?id=226070
@@ -45,11 +45,6 @@ allprojects {
         supportLibraryVersion = '25.3.1'
         dexmakerVersion = '1.2'
         mockitoVersion = '1.9.5'
-        releaseRepoName = getBintrayRepo()
-        releaseUserOrg = 'google'
-        releaseGroupId = 'com.google.android.exoplayer'
-        releaseVersion = 'r2.4.4'
-        releaseWebsite = 'https://github.com/google/ExoPlayer'
     }
     if (it.hasProperty('externalBuildDir')) {
         if (!new File(externalBuildDir).isAbsolute()) {
@@ -57,12 +52,6 @@ allprojects {
         }
         buildDir = "${externalBuildDir}/${project.name}"
     }
-}
-
-def getBintrayRepo() {
-    boolean publicRepo = hasProperty('publicRepo') &&
-        property('publicRepo').toBoolean()
-    return publicRepo ? 'exoplayer' : 'exoplayer-test'
 }
 
 apply from: 'javadoc_combined.gradle'
