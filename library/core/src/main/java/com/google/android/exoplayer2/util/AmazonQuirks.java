@@ -43,6 +43,8 @@ public final class AmazonQuirks {
     private static final boolean isKindleTablet;
     private static final boolean isFirePhone;
 
+    private static boolean isSnappingToVsyncDisabled;
+
     // This static block must be the last
     //INIT ORDERING IS IMPORTANT IN THIS BLOCK!
     static {
@@ -52,6 +54,7 @@ public final class AmazonQuirks {
         isFireTVStick  = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_STICK_DEVICE_MODEL);
         isKindleTablet = isAmazonDevice && DEVICEMODEL.startsWith(KINDLE_TABLET_DEVICE_MODEL);
         isFirePhone = isAmazonDevice && DEVICEMODEL.startsWith(FIRE_PHONE_DEVICE_MODEL);
+        isSnappingToVsyncDisabled = false;
         loadForcedLogSettings();
     }
 
@@ -142,4 +145,15 @@ public final class AmazonQuirks {
              return null;
          }
      }
+    /*
+     * To disable snapping the frame release times to VSYNC call this function with true
+     * By default, snapping to VSYNC is enabled if this function is not called.
+     */
+    public static void disableSnappingToVsync(boolean disable) {
+         isSnappingToVsyncDisabled = disable;
+    }
+
+    public static boolean isSnappingToVsyncDisabled() {
+         return isSnappingToVsyncDisabled;
+    }
 }
