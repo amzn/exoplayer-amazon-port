@@ -173,7 +173,13 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
     this.allowedJoiningTimeMs = allowedJoiningTimeMs;
     this.maxDroppedFramesToNotify = maxDroppedFramesToNotify;
     this.context = context.getApplicationContext();
-    frameReleaseTimeHelper = new VideoFrameReleaseTimeHelper(context);
+    // AMZN_CHANGE_BEGIN
+    if (AmazonQuirks.isSnappingToVsyncDisabled()) {
+      frameReleaseTimeHelper = new VideoFrameReleaseTimeHelper();
+    } else {
+      frameReleaseTimeHelper = new VideoFrameReleaseTimeHelper(context);
+    }
+    // AMZN_CHANGE_END
     eventDispatcher = new EventDispatcher(eventHandler, eventListener);
     deviceNeedsAutoFrcWorkaround = deviceNeedsAutoFrcWorkaround();
     pendingOutputStreamOffsetsUs = new long[MAX_PENDING_OUTPUT_STREAM_OFFSET_COUNT];
