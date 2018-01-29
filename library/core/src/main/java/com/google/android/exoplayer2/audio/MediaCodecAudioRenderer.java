@@ -55,6 +55,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   private int channelCount;
   private long currentPositionUs;
   private boolean allowPositionDiscontinuity;
+  private boolean tunneling;
 
   private static final String TAG = MediaCodecAudioRenderer.class.getSimpleName();
   private final Logger log = new Logger(Logger.Module.Audio, TAG);
@@ -139,6 +140,11 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
     super(C.TRACK_TYPE_AUDIO, mediaCodecSelector, drmSessionManager, playClearSamplesWithoutKeys);
     audioTrack = new AudioTrack(audioCapabilities, audioProcessors, new AudioTrackListener());
     eventDispatcher = new EventDispatcher(eventHandler, eventListener);
+  }
+
+  @Override
+  protected boolean tunnelingEnabled() {
+    return tunneling;
   }
 
   @Override
@@ -307,8 +313,10 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
     int tunnelingAudioSessionId = getConfiguration().tunnelingAudioSessionId;
     if (tunnelingAudioSessionId != C.AUDIO_SESSION_ID_UNSET) {
       audioTrack.enableTunnelingV21(tunnelingAudioSessionId);
+      tunneling = true;
     } else {
       audioTrack.disableTunneling();
+      tunneling = false;
     }
   }
 

@@ -194,6 +194,11 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   }
 
   @Override
+  protected boolean tunnelingEnabled() {
+    return tunneling;
+  }
+
+  @Override
   protected int supportsFormat(MediaCodecSelector mediaCodecSelector, Format format)
       throws DecoderQueryException {
     String mimeType = format.sampleMimeType;
@@ -855,6 +860,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
       boolean deviceNeedsAutoFrcWorkaround, String codecName, //AMZN_CHANGE_ONELINE
       int tunnelingAudioSessionId) {
     MediaFormat frameworkMediaFormat = format.getFrameworkMediaFormatV16();
+    Log.w(TAG, "max dim: " + codecMaxValues.width + "x" + codecMaxValues.height);
     // Set the maximum adaptive video dimensions.
     frameworkMediaFormat.setInteger(MediaFormat.KEY_MAX_WIDTH, codecMaxValues.width);
     frameworkMediaFormat.setInteger(MediaFormat.KEY_MAX_HEIGHT, codecMaxValues.height);

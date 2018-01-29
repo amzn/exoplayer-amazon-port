@@ -302,6 +302,15 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       throws DecoderQueryException;
 
   /**
+   * Returns if tunneling is enabled.
+   *
+   * @return by default tunneling is disabled unless it's overriden by the renderer.
+   */
+  protected boolean tunnelingEnabled() {
+    return false;
+  }
+
+  /**
    * Returns a {@link MediaCodecInfo} for a given format.
    *
    * @param mediaCodecSelector The decoder selector.
@@ -981,6 +990,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
   @SuppressWarnings("deprecation")
   private boolean drainOutputBuffer(long positionUs, long elapsedRealtimeUs)
       throws ExoPlaybackException {
+
     if (log.allowVerbose()) {
       log.v("drainOutputBuffer: positionUs = " + positionUs + " elapsedRealtimeUs = " + elapsedRealtimeUs);
     }
@@ -1001,6 +1011,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
         outputIndex = codec.dequeueOutputBuffer(outputBufferInfo,
             getDequeueOutputBufferTimeoutUs());
       }
+
       if (outputIndex >= 0) {
         // We've dequeued a buffer.
         if (shouldSkipAdaptationWorkaroundOutputBuffer) {
@@ -1033,9 +1044,10 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
         processOutputBuffersChanged();
         return true;
       } else /* MediaCodec.INFO_TRY_AGAIN_LATER (-1) or unknown negative return value */ {
-        if (codecNeedsEosPropagationWorkaround && (inputStreamEnded
+        if ((codecNeedsEosPropagationWorkaround || tunnelingEnabled()) && (inputStreamEnded
             || codecReinitializationState == REINITIALIZATION_STATE_WAIT_END_OF_STREAM)) {
-          log.i("dequeueOutputBuffer: processEndOfStream will be called while codecNeedsEosPropagationWorkaround is set." );
+          log.i(
+              "dequeueOutputBuffer: processEndOfStream will be called while codecNeedsEosPropagationWorkaround is set.");
           processEndOfStream();
         }
         return false;
