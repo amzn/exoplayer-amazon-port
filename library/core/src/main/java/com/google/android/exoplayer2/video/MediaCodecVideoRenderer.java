@@ -860,7 +860,6 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
       boolean deviceNeedsAutoFrcWorkaround, String codecName, //AMZN_CHANGE_ONELINE
       int tunnelingAudioSessionId) {
     MediaFormat frameworkMediaFormat = format.getFrameworkMediaFormatV16();
-    Log.w(TAG, "max dim: " + codecMaxValues.width + "x" + codecMaxValues.height);
     // Set the maximum adaptive video dimensions.
     frameworkMediaFormat.setInteger(MediaFormat.KEY_MAX_WIDTH, codecMaxValues.width);
     frameworkMediaFormat.setInteger(MediaFormat.KEY_MAX_HEIGHT, codecMaxValues.height);
