@@ -302,9 +302,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       throws DecoderQueryException;
 
   /**
-   * Returns if tunneling is enabled.
-   *
-   * @return by default tunneling is disabled unless it's overriden by the renderer.
+   * By default tunneling is disabled unless it's overriden by the renderer.
    */
   protected boolean tunnelingEnabled() {
     return false;
