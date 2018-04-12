@@ -40,29 +40,29 @@ import java.util.List;
  * Helper class to download DASH streams.
  *
  * <p>Except {@link #getTotalSegments()}, {@link #getDownloadedSegments()} and
- * {@link #getDownloadedBytes()}, this class isn't thread safe.
+ * {@link #getDownloadedBytes()}, this class isn't thread safe.</p>
  *
- * <p>Example usage:
- *
+ * <p>Example usage:</p>
  * <pre>
  * {@code
- * SimpleCache cache = new SimpleCache(downloadFolder, new NoOpCacheEvictor());
- * DefaultHttpDataSourceFactory factory = new DefaultHttpDataSourceFactory("ExoPlayer", null);
- * DownloaderConstructorHelper constructorHelper =
- *     new DownloaderConstructorHelper(cache, factory);
- * DashDownloader dashDownloader = new DashDownloader(manifestUrl, constructorHelper);
- * // Select the first representation of the first adaptation set of the first period
- * dashDownloader.selectRepresentations(new RepresentationKey[] {new RepresentationKey(0, 0, 0)});
- * dashDownloader.download(new ProgressListener() {
- *   @Override
- *   public void onDownloadProgress(Downloader downloader, float downloadPercentage,
- *       long downloadedBytes) {
- *     // Invoked periodically during the download.
- *   }
- * });
- * // Access downloaded data using CacheDataSource
- * CacheDataSource cacheDataSource =
- *     new CacheDataSource(cache, factory.createDataSource(), CacheDataSource.FLAG_BLOCK_ON_CACHE);}
+ *   SimpleCache cache = new SimpleCache(downloadFolder, new NoOpCacheEvictor());
+ *   DefaultHttpDataSourceFactory factory = new DefaultHttpDataSourceFactory("ExoPlayer", null);
+ *   DownloaderConstructorHelper constructorHelper =
+ *       new DownloaderConstructorHelper(cache, factory);
+ *   DashDownloader dashDownloader = new DashDownloader(manifestUrl, constructorHelper);
+ *   // Select the first representation of the first adaptation set of the first period
+ *   dashDownloader.selectRepresentations(new RepresentationKey[] {new RepresentationKey(0, 0, 0)});
+ *   dashDownloader.download(new ProgressListener() {
+ *    {@literal @}Override
+ *     public void onDownloadProgress(Downloader downloader, float downloadPercentage,
+ *         long downloadedBytes) {
+ *       // Invoked periodically during the download.
+ *     }
+ *   });
+ *   // Access downloaded data using CacheDataSource
+ *   CacheDataSource cacheDataSource =
+ *       new CacheDataSource(cache, factory.createDataSource(), CacheDataSource.FLAG_BLOCK_ON_CACHE);
+ * }
  * </pre>
  */
 public final class DashDownloader extends SegmentDownloader<DashManifest, RepresentationKey> {

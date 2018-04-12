@@ -34,29 +34,29 @@ import java.util.List;
  * Helper class to download SmoothStreaming streams.
  *
  * <p>Except {@link #getTotalSegments()}, {@link #getDownloadedSegments()} and
- * {@link #getDownloadedBytes()}, this class isn't thread safe.
+ * {@link #getDownloadedBytes()}, this class isn't thread safe.</p>
  *
- * <p>Example usage:
- *
+ * <p>Example usage:</p>
  * <pre>
  * {@code
- * SimpleCache cache = new SimpleCache(downloadFolder, new NoOpCacheEvictor());
- * DefaultHttpDataSourceFactory factory = new DefaultHttpDataSourceFactory("ExoPlayer", null);
- * DownloaderConstructorHelper constructorHelper =
- *     new DownloaderConstructorHelper(cache, factory);
- * SsDownloader ssDownloader = new SsDownloader(manifestUrl, constructorHelper);
- * // Select the first track of the first stream element
- * ssDownloader.selectRepresentations(new TrackKey[] {new TrackKey(0, 0)});
- * ssDownloader.download(new ProgressListener() {
- *   @Override
- *   public void onDownloadProgress(Downloader downloader, float downloadPercentage,
- *       long downloadedBytes) {
- *     // Invoked periodically during the download.
- *   }
- * });
- * // Access downloaded data using CacheDataSource
- * CacheDataSource cacheDataSource =
- *     new CacheDataSource(cache, factory.createDataSource(), CacheDataSource.FLAG_BLOCK_ON_CACHE);}
+ *   SimpleCache cache = new SimpleCache(downloadFolder, new NoOpCacheEvictor());
+ *   DefaultHttpDataSourceFactory factory = new DefaultHttpDataSourceFactory("ExoPlayer", null);
+ *   DownloaderConstructorHelper constructorHelper =
+ *       new DownloaderConstructorHelper(cache, factory);
+ *   SsDownloader ssDownloader = new SsDownloader(manifestUrl, constructorHelper);
+ *   // Select the first track of the first stream element
+ *   ssDownloader.selectRepresentations(new TrackKey[] {new TrackKey(0, 0)});
+ *   ssDownloader.download(new ProgressListener() {
+ *    {@literal @}Override
+ *     public void onDownloadProgress(Downloader downloader, float downloadPercentage,
+ *         long downloadedBytes) {
+ *       // Invoked periodically during the download.
+ *     }
+ *   });
+ *   // Access downloaded data using CacheDataSource
+ *   CacheDataSource cacheDataSource =
+ *       new CacheDataSource(cache, factory.createDataSource(), CacheDataSource.FLAG_BLOCK_ON_CACHE);
+ * }
  * </pre>
  */
 public final class SsDownloader extends SegmentDownloader<SsManifest, TrackKey> {
