@@ -50,6 +50,7 @@ public final class AmazonQuirks {
     private static final boolean isSOHOKindleTablet;
 
     private static boolean isSnappingToVsyncDisabled;
+    private static boolean skipProfileLevelCheck;
 
     // This static block must be the last
     //INIT ORDERING IS IMPORTANT IN THIS BLOCK!
@@ -62,6 +63,7 @@ public final class AmazonQuirks {
         isFirePhone = isAmazonDevice && DEVICEMODEL.startsWith(FIRE_PHONE_DEVICE_MODEL);
         isSOHOKindleTablet = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(SOHO_DEVICE_MODEL);
         isSnappingToVsyncDisabled = false;
+        skipProfileLevelCheck = false;
         loadForcedLogSettings();
     }
 
@@ -201,4 +203,10 @@ public final class AmazonQuirks {
          return isSnappingToVsyncDisabled;
     }
 
+    public static void skipProfileLevelCheck(boolean skip) {
+        skipProfileLevelCheck = skip;
+    }
+    public static boolean shouldSkipProfileLevelCheck() {
+        return skipProfileLevelCheck;
+    }
 }
