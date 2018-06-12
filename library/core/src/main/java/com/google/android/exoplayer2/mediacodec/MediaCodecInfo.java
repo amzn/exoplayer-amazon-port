@@ -25,6 +25,7 @@ import android.util.Pair;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.util.AmazonQuirks; // AMZN_CHANGE_ONELINE
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.MimeTypes;
@@ -269,11 +270,14 @@ public final class MediaCodecInfo {
     }
     int profile = codecProfileAndLevel.first;
     int level = codecProfileAndLevel.second;
-    if (!isVideo && profile != CodecProfileLevel.AACObjectXHE) {
+    // AMZN_CHANGE_BEGIN
+    if (AmazonQuirks.shouldSkipProfileLevelCheck() ||
+            (!isVideo && profile != CodecProfileLevel.AACObjectXHE)) {
       // Some devices/builds underreport audio capabilities, so assume support except for xHE-AAC
       // which may not be widely supported. See https://github.com/google/ExoPlayer/issues/5145.
       return true;
     }
+    // AMZN_CHANGE_END
     for (CodecProfileLevel capabilities : getProfileLevels()) {
       if (capabilities.profile == profile && capabilities.level >= level) {
         return true;
