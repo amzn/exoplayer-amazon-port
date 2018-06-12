@@ -43,6 +43,8 @@ public final class AmazonQuirks {
     private static final boolean isKindleTablet;
     private static final boolean isFirePhone;
 
+    private static boolean skipProfileLevelCheck;
+
     // This static block must be the last
     //INIT ORDERING IS IMPORTANT IN THIS BLOCK!
     static {
@@ -142,4 +144,25 @@ public final class AmazonQuirks {
              return null;
          }
      }
+    /**
+     * Called to set quirk which determines if codec profile checks should be
+     * skipped.  Call this api with true to make the player skip checking the
+     * support for profile levels of the content. Only use this if you are sure
+     * that the target device is capable playing the content, but under reports
+     * the capabilities.
+     *
+     * @param  skip If true then skip codec profile check
+     */
+    public static void skipProfileLevelCheck(boolean skip) {
+        skipProfileLevelCheck = skip;
+    }
+
+    /**
+     * Returns the state of the skip codec profile check quirk.
+     *
+     * @return the value of the skip codec profile check quirk
+     */
+    public static boolean shouldSkipProfileLevelCheck() {
+        return skipProfileLevelCheck;
+    }
 }
