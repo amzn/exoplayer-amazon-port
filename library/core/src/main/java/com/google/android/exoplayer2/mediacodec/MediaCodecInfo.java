@@ -26,6 +26,7 @@ import android.support.annotation.Nullable;
 import android.util.Log;
 import android.util.Pair;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.util.AmazonQuirks;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
@@ -206,6 +207,11 @@ public final class MediaCodecInfo {
       // If we don't know any better, we assume that the profile and level are supported.
       return true;
     }
+    // AMZN_CHANGE_BEGIN
+    if (AmazonQuirks.shouldSkipProfileLevelCheck()) {
+      return true;
+    }
+    // AMZN_CHANGE_END
     for (CodecProfileLevel capabilities : getProfileLevels()) {
       if (capabilities.profile == codecProfileAndLevel.first
           && capabilities.level >= codecProfileAndLevel.second) {
