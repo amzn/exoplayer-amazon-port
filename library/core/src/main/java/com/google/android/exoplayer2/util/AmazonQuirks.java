@@ -44,6 +44,7 @@ public final class AmazonQuirks {
     private static final boolean isFirePhone;
 
     private static boolean isSnappingToVsyncDisabled;
+    private static boolean skipProfileLevelCheck;
 
     // This static block must be the last
     //INIT ORDERING IS IMPORTANT IN THIS BLOCK!
@@ -155,5 +156,12 @@ public final class AmazonQuirks {
 
     public static boolean isSnappingToVsyncDisabled() {
          return isSnappingToVsyncDisabled;
+    }
+
+    public static void skipProfileLevelCheck(boolean skip) {
+        skipProfileLevelCheck = skip;
+    }
+    public static boolean shouldSkipProfileLevelCheck() {
+        return skipProfileLevelCheck;
     }
 }
