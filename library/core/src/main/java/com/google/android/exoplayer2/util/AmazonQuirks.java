@@ -27,6 +27,8 @@ public final class AmazonQuirks {
     private static final String FIRETV_GEN2_DEVICE_MODEL       = "AFTS";
     private static final String FIRETV_STICK_DEVICE_MODEL      = "AFTM";
     private static final String FIRETV_STICK_GEN2_DEVICE_MODEL = "AFTT";
+    private static final String FIRETV_GEN3_DEVICE_MODEL       = "AFTN";
+    private static final String FIRETV_CUBE_GEN1_DEVICE_MODEL  = "AFTA";
     private static final String KINDLE_TABLET_DEVICE_MODEL     = "KF";
     private static final String FIRE_PHONE_DEVICE_MODEL        = "SD";
     private static final String AMAZON                         = "Amazon";
@@ -48,6 +50,8 @@ public final class AmazonQuirks {
     private static final boolean isKindleTablet;
     private static final boolean isFirePhone;
     private static final boolean isSOHOKindleTablet;
+    private static final boolean isFireTVGen3;
+    private static final boolean isFireTVCubeGen1;
 
     private static boolean isSnappingToVsyncDisabled;
     private static boolean skipProfileLevelCheck;
@@ -59,6 +63,8 @@ public final class AmazonQuirks {
         isFireTVGen1   = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN1_DEVICE_MODEL);
         isFireTVGen2   = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN2_DEVICE_MODEL);
         isFireTVStick  = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_STICK_DEVICE_MODEL);
+        isFireTVGen3   = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_GEN3_DEVICE_MODEL);
+        isFireTVCubeGen1 = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(FIRETV_CUBE_GEN1_DEVICE_MODEL);
         isKindleTablet = isAmazonDevice && DEVICEMODEL.startsWith(KINDLE_TABLET_DEVICE_MODEL);
         isFirePhone = isAmazonDevice && DEVICEMODEL.startsWith(FIRE_PHONE_DEVICE_MODEL);
         isSOHOKindleTablet = isAmazonDevice && DEVICEMODEL.equalsIgnoreCase(SOHO_DEVICE_MODEL);
@@ -206,5 +212,9 @@ public final class AmazonQuirks {
     }
     public static boolean shouldSkipProfileLevelCheck() {
         return skipProfileLevelCheck;
+    }
+
+    public static boolean codecNeedsSetOutputSurfaceWorkaround() {
+      return isFireTVGen3 || isFireTVCubeGen1;
     }
 }

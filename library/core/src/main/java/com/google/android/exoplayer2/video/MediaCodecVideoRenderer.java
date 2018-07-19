@@ -1251,7 +1251,8 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
                 || "CAM-L21".equals(Util.MODEL)) // Huawei Y6II
             && "OMX.k3.video.decoder.avc".equals(name))
         || (("HUAWEI VNS-L21".equals(Util.MODEL)) // Huawei P9 Lite
-            && "OMX.IMG.MSVDX.Decoder.AVC".equals(name));
+            && "OMX.IMG.MSVDX.Decoder.AVC".equals(name))
+        || AmazonQuirks.codecNeedsSetOutputSurfaceWorkaround(); // AMZN_CHANGE_ONELINE
   }
 
   protected static final class CodecMaxValues {
