@@ -20,7 +20,10 @@ import android.content.pm.PackageManager;
 import android.media.MediaDrm;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Pair;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -40,6 +43,10 @@ import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.RenderersFactory;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.demo.Sample.UriSample;
+// AMZN_CHANGE_BEGIN
+import com.google.android.exoplayer2.audio.AudioCapabilities;
+import com.google.android.exoplayer2.audio.AudioCapabilitiesReceiver;
+// AMZN_CHANGE_END
 import com.google.android.exoplayer2.drm.DefaultDrmSessionManager;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.drm.ExoMediaCrypto;
@@ -85,9 +92,10 @@ import java.net.CookiePolicy;
 
 /** An activity that plays media using {@link SimpleExoPlayer}. */
 public class PlayerActivity extends AppCompatActivity
-    implements OnClickListener, PlaybackPreparer, PlayerControlView.VisibilityListener {
+    implements OnClickListener, PlaybackPreparer, PlayerControlView.VisibilityListener, AudioCapabilitiesReceiver.Listener  {
 
   // Activity extras.
+  public static final String TAG = PlayerActivity.class.getSimpleName();
 
   public static final String SPHERICAL_STEREO_MODE_EXTRA = "spherical_stereo_mode";
   public static final String SPHERICAL_STEREO_MODE_MONO = "mono";
@@ -161,6 +169,7 @@ public class PlayerActivity extends AppCompatActivity
   private AdsLoader adsLoader;
   private Uri loadedAdTagUri;
 
+  private AudioCapabilitiesReceiver audioCapabilitiesReceiver; // AMZN_CHANGE_ONELINE
   // Activity lifecycle
 
   @Override
@@ -217,6 +226,10 @@ public class PlayerActivity extends AppCompatActivity
       trackSelectorParameters = builder.build();
       clearStartPosition();
     }
+    // AMZN_CHANGE_BEGIN
+    audioCapabilitiesReceiver = new AudioCapabilitiesReceiver(this, this);
+    audioCapabilitiesReceiver.register();
+    // AMZN_CHANGE_END
   }
 
   @Override
@@ -336,6 +349,27 @@ public class PlayerActivity extends AppCompatActivity
     player.retry();
   }
 
+    // AudioCapabilitiesReceiver.Listener methods
+  // AMZN_CHANGE_BEGIN
+  @Override
+  public void onAudioCapabilitiesChanged(AudioCapabilities audioCapabilities) {
+    if (player == null) {
+      return;
+    }
+    //boolean backgrounded = player.getBackgrounded();
+    Log.d(TAG, "onAudioCapabilitiesChanged(), rebuild pipeline. Caps = " + audioCapabilities);
+
+    releasePlayer();
+
+    Handler handler = new Handler(Looper.getMainLooper());
+    handler.post(new Runnable() {
+        @Override
+        public void run() {
+           initializePlayer();
+        }
+    });
+  }
+  // AMZN_CHANGE_END
   // PlaybackControlView.VisibilityListener implementation
 
   @Override
