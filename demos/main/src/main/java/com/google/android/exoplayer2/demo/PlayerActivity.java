@@ -21,9 +21,12 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Pair;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -41,6 +44,8 @@ import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.PlaybackPreparer;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.audio.AudioCapabilities;
+import com.google.android.exoplayer2.audio.AudioCapabilitiesReceiver;
 import com.google.android.exoplayer2.drm.DefaultDrmSessionManager;
 import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
 import com.google.android.exoplayer2.drm.FrameworkMediaDrm;
@@ -92,8 +97,11 @@ import java.util.UUID;
 
 /** An activity that plays media using {@link SimpleExoPlayer}. */
 public class PlayerActivity extends Activity
-    implements OnClickListener, PlaybackPreparer, PlayerControlView.VisibilityListener {
+    implements OnClickListener, PlaybackPreparer,
+    PlayerControlView.VisibilityListener,
+    AudioCapabilitiesReceiver.Listener  {
 
+  public static final String TAG = "PlayerActivity-demo";
   public static final String DRM_SCHEME_EXTRA = "drm_scheme";
   public static final String DRM_LICENSE_URL_EXTRA = "drm_license_url";
   public static final String DRM_KEY_REQUEST_PROPERTIES_EXTRA = "drm_key_request_properties";
@@ -153,6 +161,7 @@ public class PlayerActivity extends Activity
   private Uri loadedAdTagUri;
   private ViewGroup adUiViewGroup;
 
+  private AudioCapabilitiesReceiver audioCapabilitiesReceiver;
   // Activity lifecycle
 
   @Override
@@ -183,6 +192,8 @@ public class PlayerActivity extends Activity
       trackSelectorParameters = new DefaultTrackSelector.ParametersBuilder().build();
       clearStartPosition();
     }
+    audioCapabilitiesReceiver = new AudioCapabilitiesReceiver(this, this);
+    audioCapabilitiesReceiver.register();
   }
 
   @Override
@@ -294,6 +305,27 @@ public class PlayerActivity extends Activity
   @Override
   public void preparePlayback() {
     initializePlayer();
+  }
+
+    // AudioCapabilitiesReceiver.Listener methods
+
+  @Override
+  public void onAudioCapabilitiesChanged(AudioCapabilities audioCapabilities) {
+    if (player == null) {
+      return;
+    }
+    //boolean backgrounded = player.getBackgrounded();
+    Log.d(TAG, "onAudioCapabilitiesChanged(), rebuild pipeline r2.8.4" );
+
+    releasePlayer();
+
+    Handler ahandler = new Handler(Looper.getMainLooper());
+    ahandler.post(new Runnable() {
+        @Override
+        public void run() {
+           initializePlayer();
+        }
+    });
   }
 
   // PlaybackControlView.VisibilityListener implementation
@@ -614,6 +646,10 @@ public class PlayerActivity extends Activity
       if (trackGroups.length != 0) {
         Button button = new Button(this);
         int label;
+        Log.d(TAG, "player is null = " + (player == null));
+        if (player == null) {
+            return;
+        }
         switch (player.getRendererType(i)) {
           case C.TRACK_TYPE_AUDIO:
             label = R.string.exo_track_selection_title_audio;

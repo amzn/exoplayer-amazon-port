@@ -48,6 +48,7 @@ public final class AudioCapabilitiesReceiver {
 
   }
 
+  public static final String TAG = "AudioCapReceiver";
   private final Context context;
   private final Listener listener;
   private final BroadcastReceiver receiver;
@@ -65,15 +66,22 @@ public final class AudioCapabilitiesReceiver {
   public AudioCapabilitiesReceiver(Context context, Listener listener) {
     this.context = Assertions.checkNotNull(context);
     this.listener = Assertions.checkNotNull(listener);
-    this.receiver = Util.SDK_INT >= 21 ? new HdmiAudioPlugBroadcastReceiver() : null;
     // AMZN_CHANGE_BEGIN
+    boolean useSurroundSoundFlag = false;
     if (Util.SDK_INT >= 17) {
       this.resolver = context.getContentResolver();
       this.observer = new SurroundSoundSettingObserver();
+      useSurroundSoundFlag = AudioCapabilities.useSurroundSoundFlagV17(
+            this.resolver);
     } else {
       this.resolver = null;
       this.observer = null;
     }
+    // Don't listen for audio plug encodings if useSurroundSoundFlag is set.
+    // If useSurroundSoundFlag is set then the platform controls what the
+    // audio output is by using the iSurroundSoundEnabled setting.
+    this.receiver = (Util.SDK_INT >= 21 && !useSurroundSoundFlag) ?
+            new HdmiAudioPlugBroadcastReceiver() : null;
     // AMZN_CHANGE_END
   }
 
@@ -154,9 +162,23 @@ public final class AudioCapabilitiesReceiver {
     @Override
     public void onChange(boolean selfChange) {
       super.onChange(selfChange);
+      boolean useSurroundSoundFlag = AudioCapabilities.useSurroundSoundFlagV17(
+            resolver);
+      boolean isSurroundSoundEnabled = AudioCapabilities.
+            isSurroundSoundEnabledV17(resolver);
       AudioCapabilities newAudioCapabilities;
-      if (AudioCapabilities.isSurroundSoundEnabledV17(resolver)) {
+
+
+      // Use the isSurroundSoundEnbled to determine audio out and ignore audio
+      // plug encodings.
+      if (useSurroundSoundFlag) {
         // override HDMI capabilities and enable Surround Sound audio capability
+        // if surround sound enabled setting is set
+        newAudioCapabilities = (isSurroundSoundEnabled) ?
+                AudioCapabilities.SURROUND_AUDIO_CAPABILITIES :
+                AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES;
+      } else if (isSurroundSoundEnabled) {
+            // This is a legacy use case.
         newAudioCapabilities = AudioCapabilities.SURROUND_AUDIO_CAPABILITIES;
       } else {
         // fallback to last known HDMI audioCapabilities,
