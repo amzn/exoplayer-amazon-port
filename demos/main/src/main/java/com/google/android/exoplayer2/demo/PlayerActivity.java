@@ -19,7 +19,10 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Pair;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -38,6 +41,10 @@ import com.google.android.exoplayer2.RenderersFactory;
 import com.google.android.exoplayer2.Tracks;
 import com.google.android.exoplayer2.audio.AudioAttributes;
 import com.google.android.exoplayer2.drm.DefaultDrmSessionManagerProvider;
+// AMZN_CHANGE_BEGIN
+import com.google.android.exoplayer2.audio.AudioCapabilities;
+import com.google.android.exoplayer2.audio.AudioCapabilitiesReceiver;
+// AMZN_CHANGE_END
 import com.google.android.exoplayer2.drm.FrameworkMediaDrm;
 import com.google.android.exoplayer2.ext.ima.ImaAdsLoader;
 import com.google.android.exoplayer2.ext.ima.ImaServerSideAdInsertionMediaSource;
@@ -61,7 +68,10 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /** An activity that plays media using {@link ExoPlayer}. */
 public class PlayerActivity extends AppCompatActivity
-    implements OnClickListener, StyledPlayerView.ControllerVisibilityListener {
+    implements OnClickListener, StyledPlayerView.ControllerVisibilityListener, AudioCapabilitiesReceiver.Listener { // AMZN_CHANGE_ONELINE
+
+  // Activity extras.
+  public static final String TAG = PlayerActivity.class.getSimpleName(); // AMZN_CHANGE_ONELINE
 
   // Saved instance state keys.
 
@@ -99,7 +109,9 @@ public class PlayerActivity extends AppCompatActivity
   private ImaServerSideAdInsertionMediaSource.AdsLoader.@MonotonicNonNull State
       serverSideAdsLoaderState;
 
-  // Activity lifecycle.
+  private AudioCapabilitiesReceiver audioCapabilitiesReceiver; // AMZN_CHANGE_ONELINE
+  
+  // Activity lifecycle
 
   @Override
   public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -129,6 +141,10 @@ public class PlayerActivity extends AppCompatActivity
       trackSelectionParameters = new TrackSelectionParameters.Builder(/* context= */ this).build();
       clearStartPosition();
     }
+    // AMZN_CHANGE_BEGIN
+    audioCapabilitiesReceiver = new AudioCapabilitiesReceiver(this, this);
+    audioCapabilitiesReceiver.register();
+    // AMZN_CHANGE_END
   }
 
   @Override
@@ -243,6 +259,27 @@ public class PlayerActivity extends AppCompatActivity
     }
   }
 
+  // AMZN_CHANGE_BEGIN
+  // AudioCapabilitiesReceiver.Listener methods
+  @Override
+  public void onAudioCapabilitiesChanged(AudioCapabilities audioCapabilities) {
+    if (player == null) {
+      return;
+    }
+    //boolean backgrounded = player.getBackgrounded();
+    Log.d(TAG, "onAudioCapabilitiesChanged(), rebuild pipeline. Caps = " + audioCapabilities);
+
+    releasePlayer();
+
+    Handler handler = new Handler(Looper.getMainLooper());
+    handler.post(new Runnable() {
+        @Override
+        public void run() {
+           initializePlayer();
+        }
+    });
+  }
+  // AMZN_CHANGE_END
   // StyledPlayerView.ControllerVisibilityListener implementation
 
   @Override
