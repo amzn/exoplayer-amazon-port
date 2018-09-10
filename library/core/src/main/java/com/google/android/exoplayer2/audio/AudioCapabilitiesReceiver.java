@@ -54,6 +54,9 @@ public final class AudioCapabilitiesReceiver {
   @Nullable private final BroadcastReceiver receiver;
   @Nullable private final ExternalSurroundSoundSettingObserver externalSurroundSoundSettingObserver;
 
+  // AMZN_CHANGE_BEGIN
+  private final ContentResolver resolver;
+  // AMZN_CHANGE_END
   /* package */ @Nullable AudioCapabilities audioCapabilities;
   private boolean registered;
 
@@ -65,14 +68,29 @@ public final class AudioCapabilitiesReceiver {
     context = context.getApplicationContext();
     this.context = context;
     this.listener = Assertions.checkNotNull(listener);
+    // TODO: revisit
     handler = new Handler(Util.getLooper());
-    receiver = Util.SDK_INT >= 21 ? new HdmiAudioPlugBroadcastReceiver() : null;
     Uri externalSurroundSoundUri = AudioCapabilities.getExternalSurroundSoundGlobalSettingUri();
     externalSurroundSoundSettingObserver =
         externalSurroundSoundUri != null
             ? new ExternalSurroundSoundSettingObserver(
                 handler, context.getContentResolver(), externalSurroundSoundUri)
             : null;
+    // AMZN_CHANGE_BEGIN
+    boolean useSurroundSoundFlag = false;
+    if (Util.SDK_INT >= 17) {
+      this.resolver = context.getContentResolver();
+      useSurroundSoundFlag = AudioCapabilities.useSurroundSoundFlagV17(
+            resolver);
+    } else {
+      this.resolver = null;
+    }
+    // Don't listen for audio plug encodings if useSurroundSoundFlag is set.
+    // If useSurroundSoundFlag is set then the platform controls what the
+    // audio output is by using the iSurroundSoundEnabled setting.
+    this.receiver = (Util.SDK_INT >= 21 && !useSurroundSoundFlag) ?
+            new HdmiAudioPlugBroadcastReceiver() : null;
+    // AMZN_CHANGE_END
   }
 
   /**
@@ -159,6 +177,7 @@ public final class AudioCapabilitiesReceiver {
 
     @Override
     public void onChange(boolean selfChange) {
+      super.onChange(selfChange);
       onNewAudioCapabilities(AudioCapabilities.getCapabilities(context));
     }
   }
