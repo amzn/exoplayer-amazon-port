@@ -21,7 +21,12 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+// AMZN_CHANGE_BEGIN
+import android.os.Handler;
+import android.os.Looper;
+// AMZN_CHANGE_END
 import android.util.Pair;
+import android.util.Log; // AMZN_CHANGE_ONELINE
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -40,6 +45,10 @@ import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.RenderersFactory;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.audio.AudioAttributes;
+// AMZN_CHANGE_BEGIN
+import com.google.android.exoplayer2.audio.AudioCapabilities;
+import com.google.android.exoplayer2.audio.AudioCapabilitiesReceiver;
+// AMZN_CHANGE_END
 import com.google.android.exoplayer2.drm.FrameworkMediaDrm;
 import com.google.android.exoplayer2.ext.ima.ImaAdsLoader;
 import com.google.android.exoplayer2.mediacodec.MediaCodecRenderer.DecoderInitializationException;
@@ -69,8 +78,9 @@ import java.util.List;
 
 /** An activity that plays media using {@link SimpleExoPlayer}. */
 public class PlayerActivity extends AppCompatActivity
-    implements OnClickListener, PlaybackPreparer, StyledPlayerControlView.VisibilityListener {
+    implements OnClickListener, PlaybackPreparer, StyledPlayerControlView.VisibilityListener, AudioCapabilitiesReceiver.Listener { // AMZN_CHANGE_ONELINE
 
+  public static final String TAG = PlayerActivity.class.getSimpleName(); // AMZN_CHANGE_ONELINE
   // Saved instance state keys.
 
   private static final String KEY_TRACK_SELECTOR_PARAMETERS = "track_selector_parameters";
@@ -107,6 +117,7 @@ public class PlayerActivity extends AppCompatActivity
   private AdsLoader adsLoader;
   private Uri loadedAdTagUri;
 
+  private AudioCapabilitiesReceiver audioCapabilitiesReceiver; // AMZN_CHANGE_ONELINE
   // Activity lifecycle
 
   @Override
@@ -139,6 +150,10 @@ public class PlayerActivity extends AppCompatActivity
       trackSelectorParameters = builder.build();
       clearStartPosition();
     }
+    // AMZN_CHANGE_BEGIN
+    audioCapabilitiesReceiver = new AudioCapabilitiesReceiver(this, this);
+    audioCapabilitiesReceiver.register();
+    // AMZN_CHANGE_END
   }
 
   @Override
@@ -260,6 +275,27 @@ public class PlayerActivity extends AppCompatActivity
   }
 
   // PlayerControlView.VisibilityListener implementation
+    // AudioCapabilitiesReceiver.Listener methods
+  // AMZN_CHANGE_BEGIN
+  @Override
+  public void onAudioCapabilitiesChanged(AudioCapabilities audioCapabilities) {
+    if (player == null) {
+      return;
+    }
+    //boolean backgrounded = player.getBackgrounded();
+    Log.d(TAG, "onAudioCapabilitiesChanged(), rebuild pipeline. Caps = " + audioCapabilities);
+
+    releasePlayer();
+
+    Handler handler = new Handler(Looper.getMainLooper());
+    handler.post(new Runnable() {
+        @Override
+        public void run() {
+           initializePlayer();
+        }
+    });
+  }
+  // AMZN_CHANGE_END
 
   @Override
   public void onVisibilityChange(int visibility) {
