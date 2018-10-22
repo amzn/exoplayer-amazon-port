@@ -613,13 +613,6 @@ import java.lang.reflect.Method;
         log.i("php is negative during latency stabilization phase ...resetting to 0");
       }
       rawPlaybackHeadPosition = 0xFFFFFFFFL & php;
-      if (lastRawPlaybackHeadPosition > rawPlaybackHeadPosition &&
-              lastRawPlaybackHeadPosition > 0x7FFFFFFFL &&
-              (lastRawPlaybackHeadPosition - rawPlaybackHeadPosition >= 0x7FFFFFFFL)) {
-        // The value must have wrapped around.
-        log.i("The playback head position wrapped around");
-        rawPlaybackHeadWrapCount++;
-      }
     } else {
       // AMZN_CHANGE_END
       rawPlaybackHeadPosition = 0xFFFFFFFFL & audioTrack.getPlaybackHeadPosition();
@@ -655,10 +648,15 @@ import java.lang.reflect.Method;
       }
     }
 
-    if (lastRawPlaybackHeadPosition > rawPlaybackHeadPosition) {
+    // AMZN_CHANGE_BEGIN
+    if (lastRawPlaybackHeadPosition > rawPlaybackHeadPosition
+            && lastRawPlaybackHeadPosition > 0x7FFFFFFFL
+            && (lastRawPlaybackHeadPosition - rawPlaybackHeadPosition >= 0x7FFFFFFFL)) {
       // The value must have wrapped around.
+      log.i("The playback head position wrapped around");
       rawPlaybackHeadWrapCount++;
     }
+    // AMZN_CHANGE_END
     lastRawPlaybackHeadPosition = rawPlaybackHeadPosition;
     return rawPlaybackHeadPosition + (rawPlaybackHeadWrapCount << 32);
   }
