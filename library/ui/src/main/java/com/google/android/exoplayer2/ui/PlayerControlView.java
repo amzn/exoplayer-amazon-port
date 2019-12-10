@@ -786,7 +786,7 @@ public class PlayerControlView extends FrameLayout {
 
     setButtonEnabled(enablePrevious, previousButton);
     setButtonEnabled(enableRewind, rewindButton);
-    setButtonEnabled(enableFastForward, fastForwardButton);
+    //setButtonEnabled(enableFastForward, fastForwardButton);
     setButtonEnabled(enableNext, nextButton);
     if (timeBar != null) {
       timeBar.setEnabled(enableSeeking);
