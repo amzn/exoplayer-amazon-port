@@ -1657,6 +1657,22 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
       // https://github.com/google/ExoPlayer/issues/4468#issuecomment-459291645.
       return true;
     }
+    if (Util.SDK_INT >= 27) {
+      // AMZN_CHANGE_BEGIN
+      switch (Util.MODEL){
+        case "AFTR":
+        case "AFTSO001":
+        case "AFTEU014":
+        case "AFTEUFF014":
+        case "AFTEU011":
+          deviceNeedsSetOutputSurfaceWorkaround = true;
+          break;
+        default:
+          // Do nothing.
+          break;
+      }
+      // AMZN_CHANGE_END
+    }
     if (Util.SDK_INT <= 26) {
       // In general, devices running API level 27 or later should be unaffected unless observed
       // otherwise. Enable the workaround on a per-device basis. Works around:
@@ -1826,6 +1842,10 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
         case "AFTA":
         case "AFTN":
         case "JSN-L21":
+        // AMZN_CHANGE_BEGIN
+        case "AFTJMST12":
+        case "AFTKMST12":
+        // AMZN_CHANGE_END
           return true;
         default:
           break; // Do nothing.
