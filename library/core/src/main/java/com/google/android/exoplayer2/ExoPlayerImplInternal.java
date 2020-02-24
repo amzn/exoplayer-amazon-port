@@ -53,6 +53,7 @@ import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Clock;
 import com.google.android.exoplayer2.util.HandlerWrapper;
 import com.google.android.exoplayer2.util.Log;
+import com.google.android.exoplayer2.util.Logger;
 import com.google.android.exoplayer2.util.TraceUtil;
 import com.google.android.exoplayer2.util.Util;
 import com.google.common.base.Supplier;
@@ -213,6 +214,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
   @Nullable private ExoPlaybackException pendingRecoverableRendererError;
 
   private long setForegroundModeTimeoutMs;
+  private final Logger log = new Logger(Logger.Module.Player, TAG); // AMZN_CHANGE_ONELINE
 
   public ExoPlayerImplInternal(
       Renderer[] renderers,
@@ -664,6 +666,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
   private void setState(int state) {
     if (playbackInfo.playbackState != state) {
+      // AMZN_CHANGE_BEGIN
+      log.d("state: Current= " + getStateString(state) + ", Previous= "
+              + getStateString(playbackInfo.playbackState));
+      // AMZN_CHANGE_END
       playbackInfo = playbackInfo.copyWithPlaybackState(state);
     }
   }
@@ -2919,6 +2925,23 @@ import java.util.concurrent.atomic.AtomicBoolean;
     return renderer.getState() != Renderer.STATE_DISABLED;
   }
 
+  // AMZN_CHANGE_BEGIN
+  private static String getStateString(int state) {
+    switch (state) {
+      case Player.STATE_BUFFERING:
+        return "BUFFERING";
+      case Player.STATE_ENDED:
+        return "ENDED";
+      case Player.STATE_IDLE:
+        return "IDLE";
+      case Player.STATE_READY:
+        return "READY";
+      default:
+        return "UNKNOWN";
+    }
+  }
+  // AMZN_CHANGE_END
+  
   private static final class SeekPosition {
 
     public final Timeline timeline;
