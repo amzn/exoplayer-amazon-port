@@ -27,6 +27,7 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import android.content.Context; // AMZN_CHANGE_ONELINE
 
 /**
  * The default {@link MediaCodecAdapter.Factory}.
@@ -51,12 +52,20 @@ public final class DefaultMediaCodecAdapterFactory implements MediaCodecAdapter.
 
   private static final String TAG = "DMCodecAdapterFactory";
 
+  private final Context context; // AMZN_CHANGE_ONELINE
   private @Mode int asynchronousMode;
   private boolean enableSynchronizeCodecInteractionsWithQueueing;
 
+  // AMZN_CHANGE_BEGIN
   public DefaultMediaCodecAdapterFactory() {
+    this(null);
+  }
+
+  public DefaultMediaCodecAdapterFactory(Context context) {
+    this.context = context;
     asynchronousMode = MODE_DEFAULT;
   }
+  // AMZN_CHANGE_END
 
   /**
    * Forces this factory to always create {@link AsynchronousMediaCodecAdapter} instances, provided
@@ -97,9 +106,15 @@ public final class DefaultMediaCodecAdapterFactory implements MediaCodecAdapter.
   @Override
   public MediaCodecAdapter createAdapter(MediaCodecAdapter.Configuration configuration)
       throws IOException {
+    // AMZN_CHANGE_BEGIN
+    boolean isFireTvSmart = false;
+    if(context != null) {
+      isFireTvSmart = context.getPackageManager().hasSystemFeature("com.amazon.hardware.tv_screen");
+    }
     if (Util.SDK_INT >= 23
         && (asynchronousMode == MODE_ENABLED
-            || (asynchronousMode == MODE_DEFAULT && Util.SDK_INT >= 31))) {
+            || (asynchronousMode == MODE_DEFAULT && Util.SDK_INT >= 31) || (asynchronousMode == MODE_DEFAULT && isFireTvSmart && Util.SDK_INT >= 28))) {
+    // AMZN_CHANGE_END
       int trackType = MimeTypes.getTrackType(configuration.format.sampleMimeType);
       Log.i(
           TAG,

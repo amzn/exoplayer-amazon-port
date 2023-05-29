@@ -107,7 +107,7 @@ public class DefaultRenderersFactory implements RenderersFactory {
    */
   public DefaultRenderersFactory(Context context) {
     this.context = context;
-    codecAdapterFactory = new DefaultMediaCodecAdapterFactory();
+    codecAdapterFactory = new DefaultMediaCodecAdapterFactory(context); // AMZN_CHANGE_ONELINE
     extensionRendererMode = EXTENSION_RENDERER_MODE_OFF;
     allowedVideoJoiningTimeMs = DEFAULT_ALLOWED_VIDEO_JOINING_TIME_MS;
     mediaCodecSelector = MediaCodecSelector.DEFAULT;
